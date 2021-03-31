@@ -18,23 +18,28 @@ class UpSample(nn.Sequential):
 
 class Decoder(nn.Module):
     # noinspection PyTypeChecker
-    def __init__(self, num_features=1664, decoder_width = 1.0):
+    def __init__(self, num_features=1664*4, decoder_width = 1.0):
         super(Decoder, self).__init__()
         features = int(num_features * decoder_width)
-
         self.conv2 = nn.Conv2d(num_features, features, kernel_size=1, stride=1, padding=0)
 
-        self.up1 = UpSample(skip_input=features//1 + 256, output_features=features//2)
-        self.up2 = UpSample(skip_input=features//2 + 128,  output_features=features//4)
-        self.up3 = UpSample(skip_input=features//4 + 64,  output_features=features//8)
-        self.up4 = UpSample(skip_input=features//8 + 64,  output_features=features//16)
+        self.up1 = UpSample(skip_input=features//1 + 256*4, output_features=features//2)
+        self.up2 = UpSample(skip_input=features//2 + 128*4,  output_features=features//4)
+        self.up3 = UpSample(skip_input=features//4 + 64*4,  output_features=features//8)
+        self.up4 = UpSample(skip_input=features//8 + 64*4,  output_features=features//16)
 
         self.conv3 = nn.Conv2d(features//16, 1, kernel_size=3, stride=1, padding=1)
 
     def forward(self, features):
         x_block0, x_block1, x_block2, x_block3, x_block4 = features[3], features[4], features[6], features[8], features[12]
-        x_d0 = self.conv2(F.relu(x_block4))
 
+        x_block0 = torch.reshape(x_block0, (1,4*x_block0.shape[1],x_block0.shape[2],x_block0.shape[3]))
+        x_block1 = torch.reshape(x_block1, (1,4*x_block1.shape[1],x_block1.shape[2],x_block1.shape[3]))
+        x_block2 = torch.reshape(x_block2, (1,4*x_block2.shape[1],x_block2.shape[2],x_block2.shape[3]))
+        x_block3 = torch.reshape(x_block3, (1,4*x_block3.shape[1],x_block3.shape[2],x_block3.shape[3]))
+        x_block4 = torch.reshape(x_block4, (1,4*x_block4.shape[1],x_block4.shape[2],x_block4.shape[3]))
+
+        x_d0 = self.conv2(F.relu(x_block4))
         x_d1 = self.up1(x_d0, x_block3)
         x_d2 = self.up2(x_d1, x_block2)
         x_d3 = self.up3(x_d2, x_block1)

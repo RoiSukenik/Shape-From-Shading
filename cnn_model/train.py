@@ -86,6 +86,9 @@ def main():
             # Normalize depth
             depth_n = DepthNorm(depth)
 
+            #Fix for one output
+            depth_n = depth_n[0]
+            depth_n = depth_n.unsqueeze(0)
             ### debug show input img
             # plt.imshow(image[3].permute(1, 2, 0))
             # plt.show()

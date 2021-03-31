@@ -6,7 +6,50 @@ from torchvision import transforms, utils
 from PIL import Image
 from io import BytesIO
 import random
+import os
+import shutil
 
+data_name = "sfs"
+def create_pdf(input_path,to_zip=True):
+    test_dir = "sfs_test"
+    train_dir = "sfs_train"
+
+    imgs = ["lu.png", "ld.png","ru.png","rd.png",]
+    train_data_ims = []
+    train_data_depth = []
+    test_data_ims = []
+    test_data_depth = []
+    for root, dirs, files in os.walk(input_path):
+        for name in files:
+            if "depth" in name:
+                depth_img = name
+                im_num = name.split('_')[0]
+                im_names = [im_num +'_'+ im_name for im_name in imgs]
+                im_names = [im_name.replace('\\','/')for im_name in im_names]
+                depth_img=depth_img.replace('\\','/')
+                if test_dir in root:
+                    for im_name in im_names:
+                        test_data_ims.append(os.path.join(root[root.index("data"):], im_name))
+                        test_data_depth.append(os.path.join(root[root.index("data"):], depth_img))
+
+                if train_dir in root:
+                    for im_name in im_names:
+                        train_data_ims.append(os.path.join(root[root.index("data"):], im_name))
+                        train_data_depth.append(os.path.join(root[root.index("data"):], depth_img))
+
+    test_pdf ={"image_path": test_data_ims, "depth_path" : test_data_depth}
+    train_pdf ={"image_path": train_data_ims, "depth_path" : train_data_depth}
+
+    df_test = pd.DataFrame(test_pdf, columns=['image_path', 'depth_path'])  # create DataFrame
+    df_train = pd.DataFrame(train_pdf, columns=['image_path', 'depth_path'])  # create DataFrame
+
+    df_test.to_csv(input_path+'\\sfs_test.csv', header=False, index=False)
+    df_train.to_csv(input_path+'\\sfs_train.csv', header=False, index=False)
+
+    if to_zip:
+        shutil.make_archive("sfs2_data", 'zip', base_dir="data")
+
+    print("Files saved successfully")
 
 def _is_pil_image(img):
     return isinstance(img, Image.Image)
@@ -55,10 +98,10 @@ def loadZipToMem(zip_file):
     input_zip = ZipFile(zip_file)
     data = {name: input_zip.read(name) for name in input_zip.namelist()}
     nyu2_train = list(
-        (row.split(',') for row in (data['data/nyu2_train.csv']).decode("utf-8").split('\n') if len(row) > 0))
+        (row.split(',') for row in (data['data/'+data_name+'_train.csv']).decode("utf-8").split('\n') if len(row) > 0))
 
     from sklearn.utils import shuffle
-    nyu2_train = shuffle(nyu2_train, random_state=0)
+    # nyu2_train = shuffle(nyu2_train, random_state=0)
 
     # if True: nyu2_train = nyu2_train[:40]
 
@@ -73,6 +116,9 @@ class depthDatasetMemory(Dataset):
 
     def __getitem__(self, idx):
         sample = self.nyu_dataset[idx]
+        sample[0] = sample[0].replace('\\','/')
+        sample[1] = sample[1].replace('\\','/')
+        sample[1] = sample[1].replace('\r','')
         image = Image.open(BytesIO(self.data[sample[0]]))
         depth = Image.open(BytesIO(self.data[sample[1]]))
         sample = {'image': image, 'depth': depth}
@@ -153,10 +199,12 @@ def getDefaultTrainTransform():
 
 
 def getTrainingTestingData(batch_size):
-    data, nyu2_train = loadZipToMem('nyu_data.zip')
+    data, nyu2_train = loadZipToMem('sfs2_data.zip')
 
     transformed_training = depthDatasetMemory(data, nyu2_train, transform=getDefaultTrainTransform())
     transformed_testing = depthDatasetMemory(data, nyu2_train, transform=getNoTransform())
 
-    return DataLoader(transformed_training, batch_size, shuffle=True), DataLoader(transformed_testing, batch_size,
+    return DataLoader(transformed_training, batch_size, shuffle=False), DataLoader(transformed_testing, batch_size,
                                                                                   shuffle=False)
+if __name__ == '__main__':
+    create_pdf("C:\\Users\\machiel\\PycharmProjects\\Shape-From-Shading\\cnn_model\\data")
