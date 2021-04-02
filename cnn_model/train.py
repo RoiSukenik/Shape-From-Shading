@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.utils as utils
 import torchvision.utils as vutils
-# from tensorboardX import SummaryWriter
+from tensorboardX import SummaryWriter
 
 from model import Model
 from loss import ssim
@@ -20,7 +20,7 @@ from torchvision.datasets import MNIST
 import pathlib
 
 PATH = str(pathlib.Path(__file__).parent.absolute()) + "\\saved_model"
-
+CUDA = torch.cuda.is_available()
 def main():
     # Arguments
     parser = argparse.ArgumentParser(description='High Quality Monocular Depth Estimation via Transfer Learning')
@@ -29,11 +29,12 @@ def main():
     parser.add_argument('--bs', default=4, type=int, help='batch size')
     args = parser.parse_args()
 
-    # Create model without gpu
-    # model = Model()
-
     # Create model with gpu
-    model = Model().cuda()
+
+    if CUDA:
+        model = Model().cuda()
+    else:
+        model = Model()
 
     print('Model created.')
 
@@ -47,25 +48,8 @@ def main():
     # Load data
     train_loader, test_loader = getTrainingTestingData(batch_size=batch_size)
 
-    ############
-    # device = torch.device("cpu")
-    #
-    # train_kwargs = {'batch_size': args.bs}
-    # test_kwargs = {'batch_size': 1000}
-    #
-    # transform=transforms.Compose([
-    #     transforms.ToTensor(),
-    #     transforms.Normalize((0.1307,), (0.3081,))
-    #     ])
-    # dataset1 = MNIST(root = './', train=True, download=True, transform=transform)
-    # dataset2 = MNIST(root='./', train=False, download=True, transform=transform)
-    #
-    # train_loader = torch.utils.data.DataLoader(dataset1, **train_kwargs)
-    # test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
-    ###########
-
-    # Logging TODO only on collab
-    # writer = SummaryWriter(comment='{}-lr{}-e{}-bs{}'.format(prefix, args.lr, args.epochs, args.bs), flush_secs=30)
+    # Logging
+    writer = SummaryWriter(comment='{}-lr{}-e{}-bs{}'.format(prefix, args.lr, args.epochs, args.bs), flush_secs=30)
 
     # Loss
     l1_criterion = nn.L1Loss()
@@ -85,10 +69,12 @@ def main():
             optimizer.zero_grad()
 
             # Prepare sample and target
-            image = torch.autograd.Variable(sample_batched['image'].cuda())
-            depth = torch.autograd.Variable(sample_batched['depth'].cuda(non_blocking=True))
-            # image = torch.autograd.Variable(sample_batched['image'])
-            # depth = torch.autograd.Variable(sample_batched['depth'])
+            if CUDA:
+                image = torch.autograd.Variable(sample_batched['image'].cuda())
+                depth = torch.autograd.Variable(sample_batched['depth'].cuda(non_blocking=True))
+            else:
+                image = torch.autograd.Variable(sample_batched['image'])
+                depth = torch.autograd.Variable(sample_batched['depth'])
 
             # Normalize depth
             depth_n = DepthNorm(depth)
@@ -134,39 +120,43 @@ def main():
                       'Loss {loss.val:.4f} ({loss.avg:.4f})'
                       .format(epoch, i, N, batch_time=batch_time, loss=losses, eta=eta))
 
-                # Log to tensorboard TODO only on collab
-                # writer.add_scalar('Train/Loss', losses.val, niter)
+                # Log to tensorboard
+                writer.add_scalar('Train/Loss', losses.val, niter)
 
-            # if i % 300 == 0:
-            #     LogProgress(model, writer, test_loader, niter)
+            if i % 300 == 0:
+                LogProgress(model, writer, test_loader, niter)
 
-        # Record epoch's intermediate results _ TODO only on collab
-        # LogProgress(model, writer, test_loader, niter)
-        # writer.add_scalar('Train/Loss.avg', losses.avg, epoch)
+        # Record epoch's intermediate results
+        LogProgress(model, writer, test_loader, niter)
+        writer.add_scalar('Train/Loss.avg', losses.avg, epoch)
 
     now = datetime.datetime.now()  # current date and time
     date_time = now.strftime("%H%M%S")
     torch.save(model.state_dict(), os.path.join(PATH,date_time+"_model.pth"))
 
 
-# def LogProgress(model, writer, test_loader, epoch):
-#     model.eval()
-#     sequential = test_loader
-#     sample_batched = next(iter(sequential))
-#     # image = torch.autograd.Variable(sample_batched['image'].cuda())
-#     # depth = torch.autograd.Variable(sample_batched['depth'].cuda(non_blocking=True))
-#     image = torch.autograd.Variable(sample_batched['image'])
-#     depth = torch.autograd.Variable(sample_batched['depth'])
-#     if epoch == 0: writer.add_image('Train.1.Image', vutils.make_grid(image.data, nrow=6, normalize=True), epoch)
-#     if epoch == 0: writer.add_image('Train.2.Depth', colorize(vutils.make_grid(depth.data, nrow=6, normalize=False)),
-#                                     epoch)
-#     output = DepthNorm(model(image))
-#     writer.add_image('Train.3.Ours', colorize(vutils.make_grid(output.data, nrow=6, normalize=False)), epoch)
-#     writer.add_image('Train.3.Diff',
-#                      colorize(vutils.make_grid(torch.abs(output - depth).data, nrow=6, normalize=False)), epoch)
-#     del image
-#     del depth
-#     del output
+def LogProgress(model, writer, test_loader, epoch):
+    model.eval()
+    sequential = test_loader
+    sample_batched = next(iter(sequential))
+
+    if CUDA:
+        image = torch.autograd.Variable(sample_batched['image'].cuda())
+        depth = torch.autograd.Variable(sample_batched['depth'].cuda(non_blocking=True))
+    else:
+        image = torch.autograd.Variable(sample_batched['image'])
+        depth = torch.autograd.Variable(sample_batched['depth'])
+
+    if epoch == 0: writer.add_image('Train.1.Image', vutils.make_grid(image.data, nrow=6, normalize=True), epoch)
+    if epoch == 0: writer.add_image('Train.2.Depth', colorize(vutils.make_grid(depth.data, nrow=6, normalize=False)),
+                                    epoch)
+    output = DepthNorm(model(image))
+    writer.add_image('Train.3.Ours', colorize(vutils.make_grid(output.data, nrow=6, normalize=False)), epoch)
+    writer.add_image('Train.3.Diff',
+                     colorize(vutils.make_grid(torch.abs(output - depth).data, nrow=6, normalize=False)), epoch)
+    del image
+    del depth
+    del output
 
 
 if __name__ == '__main__':
