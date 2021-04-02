@@ -67,5 +67,3 @@ class Model(nn.Module):
 
         return self.decoder( x )
 
-net = Model()
-print(net.encoder)
