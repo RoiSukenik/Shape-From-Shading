@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.utils as utils
 import torchvision.utils as vutils
-from tensorboardX import SummaryWriter
+# from tensorboardX import SummaryWriter
 
 from model import Model
 from loss import ssim
@@ -29,8 +29,12 @@ def main():
     parser.add_argument('--bs', default=4, type=int, help='batch size')
     args = parser.parse_args()
 
-    # Create model
-    model = Model()
+    # Create model without gpu
+    # model = Model()
+
+    # Create model with gpu
+    model = Model().cuda()
+
     print('Model created.')
 
     # Training parameters
@@ -60,8 +64,8 @@ def main():
     # test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
     ###########
 
-    # Logging
-    writer = SummaryWriter(comment='{}-lr{}-e{}-bs{}'.format(prefix, args.lr, args.epochs, args.bs), flush_secs=30)
+    # Logging TODO only on collab
+    # writer = SummaryWriter(comment='{}-lr{}-e{}-bs{}'.format(prefix, args.lr, args.epochs, args.bs), flush_secs=30)
 
     # Loss
     l1_criterion = nn.L1Loss()
@@ -81,10 +85,10 @@ def main():
             optimizer.zero_grad()
 
             # Prepare sample and target
-            # image = torch.autograd.Variable(sample_batched['image'].cuda())
-            # depth = torch.autograd.Variable(sample_batched['depth'].cuda(non_blocking=True))
-            image = torch.autograd.Variable(sample_batched['image'])
-            depth = torch.autograd.Variable(sample_batched['depth'])
+            image = torch.autograd.Variable(sample_batched['image'].cuda())
+            depth = torch.autograd.Variable(sample_batched['depth'].cuda(non_blocking=True))
+            # image = torch.autograd.Variable(sample_batched['image'])
+            # depth = torch.autograd.Variable(sample_batched['depth'])
 
             # Normalize depth
             depth_n = DepthNorm(depth)
@@ -130,15 +134,15 @@ def main():
                       'Loss {loss.val:.4f} ({loss.avg:.4f})'
                       .format(epoch, i, N, batch_time=batch_time, loss=losses, eta=eta))
 
-                # Log to tensorboard
-                writer.add_scalar('Train/Loss', losses.val, niter)
+                # Log to tensorboard TODO only on collab
+                # writer.add_scalar('Train/Loss', losses.val, niter)
 
             if i % 300 == 0:
                 LogProgress(model, writer, test_loader, niter)
 
-        # Record epoch's intermediate results
-        LogProgress(model, writer, test_loader, niter)
-        writer.add_scalar('Train/Loss.avg', losses.avg, epoch)
+        # Record epoch's intermediate results _ TODO only on collab
+        # LogProgress(model, writer, test_loader, niter)
+        # writer.add_scalar('Train/Loss.avg', losses.avg, epoch)
 
     now = datetime.datetime.now()  # current date and time
     date_time = now.strftime("%H%M%S")
