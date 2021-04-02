@@ -41,3 +41,5 @@ def colorize(value, vmin=10, vmax=1000, cmap='plasma'):
     img = value[:,:,:3]
 
     return img.transpose((2,0,1))
+
+

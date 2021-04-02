@@ -10,6 +10,7 @@ import os
 import shutil
 
 data_name = "sfs"
+
 def create_pdf(input_path,to_zip=True):
     test_dir = "sfs_test"
     train_dir = "sfs_train"
@@ -121,7 +122,18 @@ class depthDatasetMemory(Dataset):
         sample[1] = sample[1].replace('\r','')
         image = Image.open(BytesIO(self.data[sample[0]]))
         depth = Image.open(BytesIO(self.data[sample[1]]))
-        sample = {'image': image, 'depth': depth}
+
+        img = image.convert('L')
+        np_img = np.array(img, dtype=np.uint8)
+        np_img = np.dstack([np_img, np_img, np_img])
+        np_img = Image.fromarray(np_img, 'RGB')
+
+        dep = depth.convert('L')
+        np_dep = np.array(dep, dtype=np.uint8)
+        np_dep = np.dstack([np_dep, np_dep, np_dep])
+        np_dep = Image.fromarray(np_dep, 'RGB')
+
+        sample = {'image': np_img, 'depth': np_dep}
         if self.transform: sample = self.transform(sample)
         return sample
 

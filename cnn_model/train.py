@@ -1,3 +1,4 @@
+import os
 import time
 import argparse
 import datetime
@@ -16,7 +17,9 @@ import matplotlib.pyplot as plt
 
 from torchvision import datasets, transforms
 from torchvision.datasets import MNIST
+import pathlib
 
+PATH = str(pathlib.Path(__file__).parent.absolute()) + "\\saved_model"
 
 def main():
     # Arguments
@@ -89,12 +92,12 @@ def main():
             #Fix for one output
             depth_n = depth_n[0]
             depth_n = depth_n.unsqueeze(0)
+            depth_n = depth_n[0][0]
+            depth_n = torch.reshape(depth_n, (1, 1, depth_n.shape[0], depth_n.shape[1]))
             ### debug show input img
             # plt.imshow(image[3].permute(1, 2, 0))
             # plt.show()
             # plt.imshow(depth[3].permute(1, 2, 0))
-            # plt.show()
-            # plt.imshow(depth_n[3].permute(1, 2, 0))
             # plt.show()
 
             # Predict
@@ -136,6 +139,10 @@ def main():
         # Record epoch's intermediate results
         LogProgress(model, writer, test_loader, niter)
         writer.add_scalar('Train/Loss.avg', losses.avg, epoch)
+
+    now = datetime.datetime.now()  # current date and time
+    date_time = now.strftime("%H%M%S")
+    torch.save(model.state_dict(), os.path.join(PATH,date_time+"_model.pth"))
 
 
 def LogProgress(model, writer, test_loader, epoch):
