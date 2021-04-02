@@ -137,8 +137,8 @@ def main():
                 # Log to tensorboard TODO only on collab
                 # writer.add_scalar('Train/Loss', losses.val, niter)
 
-            if i % 300 == 0:
-                LogProgress(model, writer, test_loader, niter)
+            # if i % 300 == 0:
+            #     LogProgress(model, writer, test_loader, niter)
 
         # Record epoch's intermediate results _ TODO only on collab
         # LogProgress(model, writer, test_loader, niter)
@@ -149,24 +149,24 @@ def main():
     torch.save(model.state_dict(), os.path.join(PATH,date_time+"_model.pth"))
 
 
-def LogProgress(model, writer, test_loader, epoch):
-    model.eval()
-    sequential = test_loader
-    sample_batched = next(iter(sequential))
-    # image = torch.autograd.Variable(sample_batched['image'].cuda())
-    # depth = torch.autograd.Variable(sample_batched['depth'].cuda(non_blocking=True))
-    image = torch.autograd.Variable(sample_batched['image'])
-    depth = torch.autograd.Variable(sample_batched['depth'])
-    if epoch == 0: writer.add_image('Train.1.Image', vutils.make_grid(image.data, nrow=6, normalize=True), epoch)
-    if epoch == 0: writer.add_image('Train.2.Depth', colorize(vutils.make_grid(depth.data, nrow=6, normalize=False)),
-                                    epoch)
-    output = DepthNorm(model(image))
-    writer.add_image('Train.3.Ours', colorize(vutils.make_grid(output.data, nrow=6, normalize=False)), epoch)
-    writer.add_image('Train.3.Diff',
-                     colorize(vutils.make_grid(torch.abs(output - depth).data, nrow=6, normalize=False)), epoch)
-    del image
-    del depth
-    del output
+# def LogProgress(model, writer, test_loader, epoch):
+#     model.eval()
+#     sequential = test_loader
+#     sample_batched = next(iter(sequential))
+#     # image = torch.autograd.Variable(sample_batched['image'].cuda())
+#     # depth = torch.autograd.Variable(sample_batched['depth'].cuda(non_blocking=True))
+#     image = torch.autograd.Variable(sample_batched['image'])
+#     depth = torch.autograd.Variable(sample_batched['depth'])
+#     if epoch == 0: writer.add_image('Train.1.Image', vutils.make_grid(image.data, nrow=6, normalize=True), epoch)
+#     if epoch == 0: writer.add_image('Train.2.Depth', colorize(vutils.make_grid(depth.data, nrow=6, normalize=False)),
+#                                     epoch)
+#     output = DepthNorm(model(image))
+#     writer.add_image('Train.3.Ours', colorize(vutils.make_grid(output.data, nrow=6, normalize=False)), epoch)
+#     writer.add_image('Train.3.Diff',
+#                      colorize(vutils.make_grid(torch.abs(output - depth).data, nrow=6, normalize=False)), epoch)
+#     del image
+#     del depth
+#     del output
 
 
 if __name__ == '__main__':
