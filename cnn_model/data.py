@@ -148,9 +148,12 @@ class ToTensor(object):
     def __call__(self, sample):
         image, depth = sample['image'], sample['depth']
 
+        image = image.resize((320, 240)) #trial
+
         image = self.to_tensor(image)
 
-        depth = depth.resize((320, 240))
+        # depth = depth.resize((320, 240))
+        depth = depth.resize((160, 120))
 
         if self.is_test:
             depth = self.to_tensor(depth).float() / 1000
