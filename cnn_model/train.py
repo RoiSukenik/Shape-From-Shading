@@ -9,18 +9,21 @@ import torch.nn.utils as utils
 import torchvision.utils as vutils
 from tensorboardX import SummaryWriter
 
-from model import Model
-from loss import ssim
-from data import getTrainingTestingData
-from utils import AverageMeter, DepthNorm, colorize
+from cnn_model.model import Model
+from cnn_model.loss import ssim
+from cnn_model.data import getTrainingTestingData
+from cnn_model.utils import AverageMeter, DepthNorm, colorize
 import matplotlib.pyplot as plt
 
 from torchvision import datasets, transforms
 from torchvision.datasets import MNIST
 import pathlib
+from cnn_model.loss_rt_graph import start_graph_thread
+from cnn_model import loss_rt_graph
 
 PATH = str(pathlib.Path(__file__).parent.absolute()) + "\\saved_model"
 CUDA = torch.cuda.is_available()
+
 def main():
     # Arguments
     parser = argparse.ArgumentParser(description='High Quality Monocular Depth Estimation via Transfer Learning')
@@ -28,6 +31,7 @@ def main():
     parser.add_argument('--lr', '--learning-rate', default=0.0001, type=float, help='initial learning rate')
     parser.add_argument('--bs', default=4, type=int, help='batch size')
     args = parser.parse_args()
+    start_graph_thread()
 
     # Create model with gpu
 
@@ -122,6 +126,8 @@ def main():
 
                 # Log to tensorboard
                 writer.add_scalar('Train/Loss', losses.val, niter)
+            now = datetime.datetime.now()
+            loss_rt_graph.graph_data = [now.strftime("%Y/%m/%d_%H:%M:%S"), losses.avg,losses.val]
 
             if i % 300 == 0:
                 LogProgress(model, writer, test_loader, niter)
@@ -131,7 +137,7 @@ def main():
         writer.add_scalar('Train/Loss.avg', losses.avg, epoch)
 
     now = datetime.datetime.now()  # current date and time
-    date_time = now.strftime("%H%M%S")
+    date_time = now.strftime("%H:%M:%S")
     torch.save(model.state_dict(), os.path.join(PATH,date_time+"_model.pth"))
 
 
