@@ -37,6 +37,8 @@ class Thermal_Sample():
         self.date = data[0]
         self.loss_avg = data[1]
         self.loss = data[2]
+        self.epoch = data[3]
+
 
     def __eq__(self, other):
         if not isinstance(other, Thermal_Sample):
@@ -81,6 +83,7 @@ class Window(QtWidgets.QMainWindow):
 
         self.y2data = [0]
         self.line2, = self.axes2.plot([], [], 'b', label='Loss')
+        self.plt_colors = ['g', 'r', 'c', 'm', 'y', 'k']
 
         # joined legend for 3 plots
         handles, labels = [], []
@@ -88,7 +91,7 @@ class Window(QtWidgets.QMainWindow):
             for h, l in zip(*ax.get_legend_handles_labels()):
                 handles.append(h)
                 labels.append(l)
-        self.axes.legend(handles, labels, loc=4)
+        self.axes.legend(handles, labels, loc=4, fontsize=8)
 
         self.last_sample = None
         self.canvas = FigureCanvas(self.fig)
@@ -110,7 +113,6 @@ class Window(QtWidgets.QMainWindow):
             new_sample = Thermal_Sample(graph_data)
             if self.last_sample:
                 if new_sample != self.last_sample:
-                    self.last_sample = new_sample
                     self.update_figure_with_new_value(new_sample)
             else: # first time
                 self.startTime = datetime.strptime(new_sample.date, '%Y/%m/%d_%H:%M:%S')
@@ -118,7 +120,7 @@ class Window(QtWidgets.QMainWindow):
                 self.update_figure_with_new_value(new_sample)
             time_passed = str(timedelta(seconds=round((datetime.now() - self.startTime).total_seconds())))
             self.control_label.setText(
-                f"Time Elapsed: {time_passed}    LOSS: {round(self.last_sample.loss, 2)} [C°]     Loss AVG: {round(self.last_sample.loss_avg, 2)} [RPM]")
+                f"Time Elapsed: {time_passed}    LOSS: {round(self.last_sample.loss, 2)}     Loss AVG: {round(self.last_sample.loss_avg, 2)}")
 
     def update_figure_with_new_value(self, new_sample):
         sample_time = datetime.strptime(new_sample.date, '%Y/%m/%d_%H:%M:%S')
@@ -137,6 +139,20 @@ class Window(QtWidgets.QMainWindow):
         self.line.set_data(self.xdata, self.ydata)
         self.axes.relim()
         self.axes.autoscale_view()
+
+        if self.last_sample.epoch != new_sample.epoch:
+            new_c = self.plt_colors.pop(0)
+            self.plt_colors.append(new_c)
+            self.axes.axvline(x=xval, label='epoch = {}'.format(new_sample.epoch), linestyle="dashed",color=new_c)
+
+            handles, labels = [], []
+            for ax in self.fig.axes:
+                for h, l in zip(*ax.get_legend_handles_labels()):
+                    handles.append(h)
+                    labels.append(l)
+            self.axes.legend(handles, labels, loc=4, fontsize=8)
+
+        self.last_sample = new_sample
 
         self.line2.set_data(self.xdata, self.y2data)
         self.axes2.relim()

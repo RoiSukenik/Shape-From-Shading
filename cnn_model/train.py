@@ -116,7 +116,8 @@ def main():
 
             # Log progress
             niter = epoch * N + i
-            if i % 5 == 0:
+            if i % 3 == 0:
+                epoch+=1
                 # Print to console
                 print('Epoch: [{0}][{1}/{2}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.sum:.3f})\t'
@@ -127,7 +128,7 @@ def main():
                 # Log to tensorboard
                 writer.add_scalar('Train/Loss', losses.val, niter)
             now = datetime.datetime.now()
-            loss_rt_graph.graph_data = [now.strftime("%Y/%m/%d_%H:%M:%S"), losses.avg,losses.val]
+            loss_rt_graph.graph_data = [now.strftime("%Y/%m/%d_%H:%M:%S"), losses.avg,losses.val, epoch]
 
             if i % 300 == 0:
                 LogProgress(model, writer, test_loader, niter)
