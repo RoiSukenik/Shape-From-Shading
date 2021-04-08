@@ -116,8 +116,7 @@ def main():
 
             # Log progress
             niter = epoch * N + i
-            if i % 3 == 0:
-                epoch+=1
+            if i % 5 == 0:
                 # Print to console
                 print('Epoch: [{0}][{1}/{2}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.sum:.3f})\t'
