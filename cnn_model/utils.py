@@ -1,8 +1,14 @@
 import matplotlib
 import matplotlib.cm
 import numpy as np
+import matplotlib.pyplot as plt
 
-def DepthNorm(depth, maxDepth=1000.0):
+try:
+    from cnn_model.constants import MIN_DEPTH, MAX_DEPTH
+except:
+    from constants import MIN_DEPTH, MAX_DEPTH
+
+def DepthNorm(depth, maxDepth=MAX_DEPTH):
     return maxDepth / depth
 
 class AverageMeter(object):
@@ -42,4 +48,6 @@ def colorize(value, vmin=10, vmax=1000, cmap='plasma'):
 
     return img.transpose((2,0,1))
 
-
+def show_tensor_img(tensor_img):
+    plt.imshow(tensor_img.permute(1, 2, 0))
+    plt.show()

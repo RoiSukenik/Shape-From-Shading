@@ -8,9 +8,14 @@ from io import BytesIO
 import random
 import os
 import shutil
+try:
+    from cnn_model.constants import MIN_DEPTH, MAX_DEPTH
+
+except:
+    from constants import MIN_DEPTH, MAX_DEPTH
 
 data_name = "sfs"
-
+path_to_data = "/data/students/sfs/sfs2_big_data.zip"
 def create_pdf(input_path,to_zip=True):
     test_dir = "sfs_test"
     train_dir = "sfs_train"
@@ -148,17 +153,17 @@ class ToTensor(object):
     def __call__(self, sample):
         image, depth = sample['image'], sample['depth']
 
+        image = image.resize((320, 240))
         image = self.to_tensor(image)
 
-        depth = depth.resize((320, 240))
-
+        depth = depth.resize((160, 120))
         if self.is_test:
-            depth = self.to_tensor(depth).float() / 1000
+            depth = self.to_tensor(depth).float() /int(MAX_DEPTH)
         else:
-            depth = self.to_tensor(depth).float() * 1000
+            depth = self.to_tensor(depth).float() *int(MAX_DEPTH)
 
         # put in expected range
-        depth = torch.clamp(depth, 10, 1000)
+        depth = torch.clamp(depth, int(MIN_DEPTH),int(MAX_DEPTH))
 
         return {'image': image, 'depth': depth}
 
@@ -211,7 +216,7 @@ def getDefaultTrainTransform():
 
 
 def getTrainingTestingData(batch_size):
-    data, nyu2_train = loadZipToMem('sfs2_data.zip')
+    data, nyu2_train = loadZipToMem(path_to_data)
 
     transformed_training = depthDatasetMemory(data, nyu2_train, transform=getDefaultTrainTransform())
     transformed_testing = depthDatasetMemory(data, nyu2_train, transform=getNoTransform())
