@@ -5,14 +5,24 @@ from os import listdir
 from os.path import isfile, join
 import torch
 import pathlib
-from cnn_model.model import Model
-from cnn_model.utils import show_tensor_img
+try:
+    from cnn_model.model import Model
+    from cnn_model.utils import show_tensor_img
+except:
+    from model import Model
+    from utils import show_tensor_img
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d
 import torch.nn as nn
 PATH = str(pathlib.Path(__file__).parent.absolute()) + "\\saved_model"
-CUDA = torch.cuda.is_available()
-MODEL_TO_LOAD = "182612_3672_1.0000000000000002e-06_20.pth"
+CUDA = True
+try:
+    with open("last_model.txt", "r") as text_file:
+        MODEL_TO_LOAD = text_file.readline().strip()
+except:
+    pass
+
+MODEL_TO_LOAD = "sfs2_small_pics_data_08052021_125512_101_1.00e-05_2.pth"
 
 
 def _is_pil_image(img):
@@ -57,31 +67,33 @@ def to_tensor(pic):
         return img
 
 
-def load_image(im_path):
+def load_image(im_path, is_depth = False):
     img = Image.open(im_path)
     img = img.convert('L')
     np_img = np.array(img, dtype=np.uint8)
     np_img = np.dstack([np_img, np_img, np_img])
     image = Image.fromarray(np_img, 'RGB')
 
-    image = image.resize((320, 240))  # trial
+    if is_depth:
+        image = image.resize((160, 120))  # trial
     image = to_tensor(image)
 
     return image
-
+TEST_DIR = "/small_test_dir"
 def get_input_img():
-    data_dir = str(pathlib.Path(__file__).parent.absolute()) + "/test_dir"
+    data_dir = str(pathlib.Path(__file__).parent.absolute()) + TEST_DIR
 
     onlyimg = [join(data_dir, f) for f in listdir(data_dir) if isfile(join(data_dir, f))]
     return onlyimg
 
 def plot_output_image_3D(depth_tensor):
-
-    outputImageRealWorldScale = depth_tensor.detach().cpu().numpy().reshape(120, 160)
+    depth_width = 120
+    depth_height = 160
+    outputImageRealWorldScale = depth_tensor.detach().cpu().numpy().reshape(depth_width, depth_height)
     outputImageRealWorldScale = (20 * depth_tensor) + 10
-    outputImageRealWorldScale = outputImageRealWorldScale.detach().cpu().numpy().reshape(120, 160)
-    xx = range(160)
-    yy = range(120)
+    outputImageRealWorldScale = outputImageRealWorldScale.detach().cpu().numpy().reshape(depth_width, depth_height)
+    xx = range(depth_height)
+    yy = range(depth_width)
     X, Y = np.meshgrid(xx, yy)
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -98,6 +110,7 @@ def predict():
     imgs_path = get_input_img()
 
     images = [load_image(im_path) for im_path in imgs_path if "depth" not in im_path]
+    depth = [load_image(im_path, is_depth=True) for im_path in imgs_path if "depth" in im_path]
     batch = torch.stack(images)
     if CUDA:
         batch = batch.cuda()
@@ -115,6 +128,13 @@ def predict():
     m = nn.Sigmoid()
     output = m(output)
     plot_output_image_3D(output)
+
+    # depth_n = depth[0]
+    # depth_n = depth_n.unsqueeze(0)
+    # depth_n = depth_n[0][0]
+    # depth_n = torch.reshape(depth_n, (1, 1, depth_n.shape[0], depth_n.shape[1]))
+    #
+    # plot_output_image_3D(depth_n)
 
 
 if __name__ == '__main__':

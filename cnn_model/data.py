@@ -8,14 +8,16 @@ from io import BytesIO
 import random
 import os
 import shutil
+from os import listdir
+from os.path import isfile, join
+from pathlib import Path
+
 try:
-    from cnn_model.constants import MIN_DEPTH, MAX_DEPTH
+    from cnn_model.constants import MIN_DEPTH, MAX_DEPTH, DATA_NAME, DATA_PATH
 
 except:
-    from constants import MIN_DEPTH, MAX_DEPTH
+    from constants import MIN_DEPTH, MAX_DEPTH, DATA_NAME, DATA_PATH
 
-data_name = "sfs"
-path_to_data = "/data/students/sfs/sfs2_big_data.zip"
 def create_pdf(input_path,to_zip=True):
     test_dir = "sfs_test"
     train_dir = "sfs_train"
@@ -104,7 +106,7 @@ def loadZipToMem(zip_file):
     input_zip = ZipFile(zip_file)
     data = {name: input_zip.read(name) for name in input_zip.namelist()}
     nyu2_train = list(
-        (row.split(',') for row in (data['data/'+data_name+'_train.csv']).decode("utf-8").split('\n') if len(row) > 0))
+        (row.split(',') for row in (data['data/' + DATA_NAME + '_train.csv']).decode("utf-8").split('\n') if len(row) > 0))
 
     from sklearn.utils import shuffle
     # nyu2_train = shuffle(nyu2_train, random_state=0)
@@ -153,7 +155,8 @@ class ToTensor(object):
     def __call__(self, sample):
         image, depth = sample['image'], sample['depth']
 
-        image = image.resize((320, 240))
+        ### already resized pics
+        # image = image.resize((320, 240))
         image = self.to_tensor(image)
 
         depth = depth.resize((160, 120))
@@ -209,14 +212,30 @@ def getNoTransform(is_test=False):
 
 def getDefaultTrainTransform():
     return transforms.Compose([
-        RandomHorizontalFlip(),
-        RandomChannelSwap(0.5),
         ToTensor()
     ])
 
+def change_path():
+    dir_path  = Path(DATA_PATH).parent.absolute()
+    onlyfiles = [f for f in listdir(dir_path) if isfile(join(dir_path, f))]
+    print("\nChoose new data to load: ")
+    print([f"{i}: {data}" for i,data in enumerate(onlyfiles)])
+    choice = input("Your choice: ")
+    return str(dir_path)+'/'+onlyfiles[int(choice)]
 
 def getTrainingTestingData(batch_size):
-    data, nyu2_train = loadZipToMem(path_to_data)
+    path_to_load = DATA_PATH
+    print(f"Trying to load: {path_to_load}")
+    dir_path  = Path(DATA_PATH).parent.absolute()
+    onlyfiles = [f for f in listdir(dir_path) if isfile(join(dir_path, f))]
+    print("Data available: ", onlyfiles)
+    try:
+        data, nyu2_train = loadZipToMem(path_to_load)
+    except FileNotFoundError:
+        path_to_load = change_path()
+        data, nyu2_train = loadZipToMem(path_to_load)
+
+    print(f"Loaded {path_to_load}")
 
     transformed_training = depthDatasetMemory(data, nyu2_train, transform=getDefaultTrainTransform())
     transformed_testing = depthDatasetMemory(data, nyu2_train, transform=getNoTransform())
