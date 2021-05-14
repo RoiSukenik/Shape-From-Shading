@@ -1,1 +1,1 @@
-sfs2_small_pics_data_14052021_142908_101_1.00e-05_100.pth
+/home/roeematan/PycharmProjects/Shape-From-Shading/cnn_model/results/14052021_203804/saved_model/sfs2_small_face_data_14052021_203804_105_1.00e-05_1.pth

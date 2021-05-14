@@ -66,7 +66,7 @@ def save_model(model, output_path, train_size, lr, epoch, time):
             SAVED = True
 
             with open("last_model.txt", "w") as text_file:
-                print(model_name, file=text_file)
+                print(str(os.path.join(output_path,model_name)), file=text_file)
 
             print(f"MODEL SAVED SUCSSEFFULLY IN:\n{model_name}")
             print(f"Log name is:\n{log_name}")
@@ -80,7 +80,6 @@ def save_model(model, output_path, train_size, lr, epoch, time):
 
 
 def make_run_dir(date_time):
-    curr_path = PATH
     run_dir = PATH / "results" / date_time
     model_dir = run_dir / "saved_model"
     log_dir = run_dir / "log"
@@ -170,7 +169,7 @@ def main(hyper_params_dict):
 
     try:
         with open("last_log.txt", "w") as text_file:
-            print(date_time, file=text_file)
+            print(str(log_dir / date_time), file=text_file)
     except:
         pass
 
@@ -237,7 +236,7 @@ def main(hyper_params_dict):
             output = model(image)
             if SAVE_IN_RUN:
                 print("Saving Model:")
-                save_model(model, N, LEARNING_RATE, epoch, date_time)
+                save_model(model,model_dir, N, LEARNING_RATE, epoch, date_time)
                 SAVE_IN_RUN = 0
                 threading.Thread(target=save_in_run_thread).start()
 
@@ -338,7 +337,7 @@ def main(hyper_params_dict):
             except:
                 pass
         # show_net_output(output, f"Epoch_{epoch}")
-        test_predict(model, epoch)
+        test_predict(model, epoch, mid_run_dir)
         # Record epoch's intermediate results
         if USE_SCHEDULER:
             if ADAPTIVE_LEARNER:
@@ -396,5 +395,5 @@ if __name__ == '__main__':
     gc.collect()
 
     torch.cuda.empty_cache()
-    #with torch.cuda.device(GPU_TO_RUN):
-    main(HYPER_PARAMS)
+    with torch.cuda.device(GPU_TO_RUN):
+        main(HYPER_PARAMS)

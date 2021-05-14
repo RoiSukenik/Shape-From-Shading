@@ -1,1 +1,1 @@
-14052021_142908
+/home/roeematan/PycharmProjects/Shape-From-Shading/cnn_model/results/14052021_204030/log/14052021_204030

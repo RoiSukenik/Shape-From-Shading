@@ -11,12 +11,12 @@ with open("last_log.txt", "r") as text_file:
     log_id = text_file.readline().strip()
 
 PATH = str(pathlib.Path(__file__).parent.absolute())
-diff_loss_file = "/logs/" + log_id + "_loss_log.txt"
-avg_loss_file = "/logs/" + log_id + "_log.txt"
+diff_loss_file = log_id + "_loss_log.txt"
+avg_loss_file = log_id + "_log.txt"
 
-diff_loss_file_PATH = PATH + diff_loss_file
-avg_loss_file_PATH = PATH + avg_loss_file
-output_path = PATH + "/graph_results/" + log_id
+diff_loss_file_PATH =  diff_loss_file
+avg_loss_file_PATH =  avg_loss_file
+output_path = log_id
 
 
 def get_data(input_path):

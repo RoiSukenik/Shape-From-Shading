@@ -4,7 +4,9 @@ import numpy as np
 from os import listdir
 from os.path import isfile, join
 import torch
-import pathlib
+
+from pathlib import Path
+
 try:
     from cnn_model.model import Model
     from cnn_model.utils import show_tensor_img
@@ -14,13 +16,12 @@ except:
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d
 import torch.nn as nn
-PATH = str(pathlib.Path(__file__).parent.absolute()) + "\\saved_model"
 CUDA = torch.cuda.is_available()
 try:
     with open("last_model.txt", "r") as text_file:
         MODEL_TO_LOAD = text_file.readline().strip()
 except Exception as e:
-    PATH = str(pathlib.Path(__file__).parent.absolute()) +"/"
+    PATH = str(Path(__file__).parent.absolute()) +"/"
     with open(PATH + "last_model.txt", "r") as text_file:
         MODEL_TO_LOAD = text_file.readline().strip()
 
@@ -88,7 +89,7 @@ def load_image(im_path, is_depth = False):
     return image
 
 def get_input_img():
-    data_dir = str(pathlib.Path(__file__).parent.absolute()) + TEST_DIR
+    data_dir = str(Path(__file__).parent.absolute()) + TEST_DIR
 
     onlyimg = [join(data_dir, f) for f in listdir(data_dir) if isfile(join(data_dir, f))]
     return onlyimg
@@ -171,7 +172,7 @@ def predict():
     if CUDA:
         batch = batch.cuda()
 
-    model_PATH = str(pathlib.Path(__file__).parent.absolute()) + "/saved_model/" + MODEL_TO_LOAD
+    model_PATH = MODEL_TO_LOAD
 
     # show_tensor_img(images[3])
 

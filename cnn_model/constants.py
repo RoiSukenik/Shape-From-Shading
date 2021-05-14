@@ -5,7 +5,7 @@ CURRENT_DIR = str(pathlib.Path(__file__).parent.absolute())
 """"sfs2_small_face_data sfs2_data sfs2_big_data sfs2_small_pics_data"""
 
 """PATHS & DATA"""
-ZIP_NAME = "sfs2_small_pics_data"  # for loading and packaging
+ZIP_NAME = "sfs2_small_face_data"  # for loading and packaging
 DATA_PATH_FOR_ZIP = CURRENT_DIR + "/data"
 DATA_TO_TRAIN = CURRENT_DIR + "/" + ZIP_NAME
 LOGS_DIR = str(pathlib.Path(__file__).parent.absolute()) + "/logs/"
