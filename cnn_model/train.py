@@ -12,6 +12,7 @@ import torchvision.utils as vutils
 
 import matplotlib
 
+
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
@@ -24,6 +25,7 @@ try:
     from cnn_model.data import getTrainingTestingData
     from cnn_model.utils import AverageMeter, DepthNorm, colorize
     from cnn_model.constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, LOGS_DIR, NOTES, HYPER_PARAMS
+    from cnn_model.log_visualize import loss_graph
 
     # from cnn_model.loss_rt_graph import start_graph_thread
     # from cnn_model import loss_rt_graph
@@ -36,6 +38,7 @@ except:
     from data import getTrainingTestingData
     from utils import AverageMeter, DepthNorm, colorize
     from constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, NOTES, HYPER_PARAMS
+    from log_visualize import loss_graph
 
     # from loss_rt_graph import start_graph_thread
     # import loss_rt_graph
@@ -182,8 +185,8 @@ def main(hyper_params_dict):
             scheduler = StepLR(optimizer, step_size=SCHEDULER_STEP_SIZE, gamma=SCHEDULER_GAMMA)
     # Start training...
 
-    mid_save_thread = threading.Thread(target=save_in_run_thread)
-    mid_save_thread.start()
+    #mid_save_thread = threading.Thread(target=save_in_run_thread)
+    #mid_save_thread.start()
     batch_count = 0
 
     for epoch in range(args.epochs):
@@ -356,8 +359,8 @@ def main(hyper_params_dict):
         except:
             pass
     epoch = args.epochs
-    save_model(model, N, LEARNING_RATE, epoch, date_time)
-
+    save_model(model, model_dir, N, LEARNING_RATE, epoch, date_time)
+    loss_graph(str(log_dir / date_time))
     os._exit(1)
 
 
@@ -391,9 +394,7 @@ except:
 
 if __name__ == '__main__':
     import gc
-
     gc.collect()
-
     torch.cuda.empty_cache()
     with torch.cuda.device(GPU_TO_RUN):
         main(HYPER_PARAMS)
