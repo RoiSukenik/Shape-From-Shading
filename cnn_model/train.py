@@ -54,6 +54,7 @@ PATH = Path(__file__).parent.absolute()
 # CUDA = False
 CUDA = torch.cuda.is_available()
 
+MULTI_RUNS = True
 SAVE_IN_RUN = 0
 GPU_TO_RUN = 3
 
@@ -184,8 +185,9 @@ def main(hyper_params_dict):
             scheduler = StepLR(optimizer, step_size=SCHEDULER_STEP_SIZE, gamma=SCHEDULER_GAMMA)
     # Start training...
 
-    #mid_save_thread = threading.Thread(target=save_in_run_thread)
-    #mid_save_thread.start()
+    if not MULTI_RUNS:
+        mid_save_thread = threading.Thread(target=save_in_run_thread)
+        mid_save_thread.start()
     batch_count = 0
 
     for epoch in range(args.epochs):
@@ -358,9 +360,10 @@ def main(hyper_params_dict):
         except:
             pass
     epoch = args.epochs
-    save_model(model, model_dir, N, LEARNING_RATE, epoch, date_time)
     loss_graph(str(log_dir / date_time))
-    os._exit(1)
+    if not MULTI_RUNS:
+        save_model(model, model_dir, N, LEARNING_RATE, epoch, date_time)
+        os._exit(1)
 
 
 try:
