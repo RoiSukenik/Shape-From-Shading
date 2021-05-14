@@ -8,10 +8,13 @@ import torch
 import torch.nn as nn
 import torch.nn.utils as utils
 import torchvision.utils as vutils
+
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 # from tensorboardX import SummaryWriter
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
 
 try:
     from cnn_model.model import Model
@@ -19,9 +22,11 @@ try:
     from cnn_model.data import getTrainingTestingData
     from cnn_model.utils import AverageMeter, DepthNorm, colorize
     from cnn_model.constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, LEARNING_RATE, EPOCHS, VAL_RANGE, LOGS_DIR, \
-        SSIM_WEIGHT, L1_WEIGHT, USE_SCHEDULER, SCHEDULER_STEP_SIZE, SCHEDULER_GAMMA
+        SSIM_WEIGHT, L1_WEIGHT, USE_SCHEDULER, SCHEDULER_STEP_SIZE, SCHEDULER_GAMMA, ACCUMULATION_STEPS, NOTES, ADAPTIVE_LEARNER
     # from cnn_model.loss_rt_graph import start_graph_thread
     # from cnn_model import loss_rt_graph
+    from cnn_model.predict import show_net_output, test_predict
+    from cnn_model.pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
 
 except:
     from model import Model
@@ -29,9 +34,11 @@ except:
     from data import getTrainingTestingData
     from utils import AverageMeter, DepthNorm, colorize
     from constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, LEARNING_RATE, EPOCHS, VAL_RANGE, LOGS_DIR, SSIM_WEIGHT, \
-        L1_WEIGHT, USE_SCHEDULER, SCHEDULER_STEP_SIZE, SCHEDULER_GAMMA
+        L1_WEIGHT, USE_SCHEDULER, SCHEDULER_STEP_SIZE, SCHEDULER_GAMMA, ACCUMULATION_STEPS, NOTES, ADAPTIVE_LEARNER
     # from loss_rt_graph import start_graph_thread
     # import loss_rt_graph
+    from predict import show_net_output, test_predict
+    from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
 
 from torchvision import datasets, transforms
 from torchvision.datasets import MNIST
@@ -44,7 +51,7 @@ import random
 CUDA = torch.cuda.is_available()
 
 SAVE_IN_RUN = 0
-
+GPU_TO_RUN = 3
 
 def save_model(model, train_size, lr, epoch, time):
     SAVED = False
@@ -98,7 +105,7 @@ def main():
 
     if CUDA:
         model = Model().cuda()
-        model = nn.DataParallel(model,device_ids=[3])
+        model = nn.DataParallel(model,device_ids=[GPU_TO_RUN])
         model.to(f'cuda:{model.device_ids[0]}')
         print('cuda enable.')
     else:
@@ -132,9 +139,11 @@ def main():
     now = datetime.datetime.now()  # current date and time
     date_time = now.strftime("%d%m%Y_%H%M%S")
     to_print = f"Learning Rate = {LEARNING_RATE}, val_range = {VAL_RANGE}, SCHEDULER_STEP_SIZE = {SCHEDULER_STEP_SIZE}, SCHEDULER_GAMMA = {SCHEDULER_GAMMA},"
+    to_print += f" SSIM_WEIGHT = {SSIM_WEIGHT}, L1_WEIGHT = {L1_WEIGHT}, ACCUMULATION_STEPS = {ACCUMULATION_STEPS}"
+    to_print += f" NOTES = {NOTES}"
+
     with open(LOGS_DIR + date_time + "_log.txt", "a") as text_file:
         print(to_print, file=text_file)
-
 
     try:
         with open("last_log.txt", "w") as text_file:
@@ -145,10 +154,16 @@ def main():
     print("Training Params:\n", to_print)
 
     if USE_SCHEDULER:
-        scheduler = StepLR(optimizer, step_size=SCHEDULER_STEP_SIZE, gamma=SCHEDULER_GAMMA)
-
+        if ADAPTIVE_LEARNER:
+            scheduler = ReduceLROnPlateau(optimizer, 'min')
+        else:
+            scheduler = StepLR(optimizer, step_size=SCHEDULER_STEP_SIZE, gamma=SCHEDULER_GAMMA)
     # Start training...
-    threading.Thread(target=save_in_run_thread).start()
+
+    mid_save_thread = threading.Thread(target=save_in_run_thread)
+    mid_save_thread.start()
+    batch_count = 0
+    
     for epoch in range(args.epochs):
         batch_time = AverageMeter()
         losses = AverageMeter()
@@ -162,6 +177,7 @@ def main():
         # for i, sample_batched in enumerate(train_loader):
         # WRONG IND 88
         for i, rand_batch_ind in enumerate(batch_ind_lst):
+            batch_count+=1
             sample_batched = train_loader[rand_batch_ind]
             optimizer.zero_grad()
 
@@ -211,19 +227,22 @@ def main():
 
 
             # MASK ATTEMPT
-            background = depth_n != 1
+            background = depth_n == 1
+            depth_masked = depth_n.masked_fill_(background, 0.0)
+            output_masked = output.masked_fill_(background, 0.0)
 
-            depth_masked = torch.masked_select(depth_n, background)
-            output_masked = torch.masked_select(output, background)
-
-            new_shape = depth_masked.shape[0]
-
-            depth_masked = torch.reshape(depth_masked, (1, 1, 1, new_shape))
-            output_masked = torch.reshape(output_masked, (1, 1, 1, new_shape))
+            # depth_masked = torch.masked_select(depth_n, background)
+            #
+            # output_masked = torch.masked_select(output, background)
+            #
+            # new_shape = depth_masked.shape[0]
+            #
+            # depth_masked = torch.reshape(depth_masked, (1, 1, 1, new_shape))
+            # output_masked = torch.reshape(output_masked, (1, 1, 1, new_shape))
 
             ## trial with sigmoid normalize the output
-            m = nn.Sigmoid()
-            output_masked = m(output_masked)
+            #m = nn.Sigmoid()
+            #output_masked = m(output_masked)
 
             # depth_n[background] = 0
             # output_masked = output
@@ -232,14 +251,27 @@ def main():
 
             # Compute the loss
             l_depth = l1_criterion(output_masked, depth_masked)
-            l_ssim = torch.clamp((1 - ssim(output_masked, depth_masked, val_range=VAL_RANGE)) * 0.5, 0, 1)
+
+            # l_ssim = torch.clamp((1 - ssim(output_masked, depth_masked, val_range=VAL_RANGE)) * 0.5, 0, 1)
+
+            #trial new ssim
+            l_ssim = 1 - ssim(output_masked, depth_masked, data_range=1, size_average=False, nonnegative_ssim=True)  # (N,)
 
             loss = (SSIM_WEIGHT * l_ssim) + (L1_WEIGHT * l_depth)
 
             # Update step
             losses.update(loss.data.item(), image.size(0))
+
+            # Gradient Accumulation
+            loss = loss / ACCUMULATION_STEPS
             loss.backward()
-            optimizer.step()
+            if (batch_count - 1) % ACCUMULATION_STEPS == 0:
+                optimizer.step()
+                # Reset gradients, for the next accumulated batches
+                optimizer.zero_grad()
+
+            # optimizer.step()
+
 
             # Measure elapsed time
             batch_time.update(time.time() - end)
@@ -285,10 +317,14 @@ def main():
 
             except:
                 pass
-
+        #show_net_output(output, f"Epoch_{epoch}")
+        test_predict(model, epoch)
         # Record epoch's intermediate results
         if USE_SCHEDULER:
-            scheduler.step()
+            if ADAPTIVE_LEARNER:
+                scheduler.step(losses.avg)
+            else:
+                scheduler.step()
 
         try:
             LogProgress(model, writer, test_loader, niter)
@@ -303,7 +339,7 @@ def main():
     epoch = args.epochs
     save_model(model, N, LEARNING_RATE, epoch, date_time)
 
-
+    os._exit(1)
 try:
     def LogProgress(model, writer, test_loader, epoch):
         model.eval()
@@ -333,5 +369,11 @@ except:
     pass
 
 if __name__ == '__main__':
-    with torch.cuda.device(3):
+    import gc
+
+    gc.collect()
+
+    torch.cuda.empty_cache()
+
+    with torch.cuda.device(GPU_TO_RUN):
         main()

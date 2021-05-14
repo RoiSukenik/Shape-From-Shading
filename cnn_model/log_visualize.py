@@ -1,21 +1,22 @@
 import datetime
 
 import numpy as np
+
 import matplotlib.pyplot as plt
 import pathlib
 
-# log_id = "07052021_175438"
+log_id = "14052021_142908"
 
 with open("last_log.txt", "r") as text_file:
     log_id = text_file.readline().strip()
 
-PATH = str(pathlib.Path(__file__).parent.absolute()) + "/logs/"
-diff_loss_file = log_id + "_loss_log.txt"
-avg_loss_file = log_id + "_log.txt"
+PATH = str(pathlib.Path(__file__).parent.absolute())
+diff_loss_file = "/logs/" + log_id + "_loss_log.txt"
+avg_loss_file = "/logs/" + log_id + "_log.txt"
 
 diff_loss_file_PATH = PATH + diff_loss_file
 avg_loss_file_PATH = PATH + avg_loss_file
-output_path = "graph_results/" + avg_loss_file.split('.')[0]
+output_path = PATH + "/graph_results/" + log_id
 
 
 def get_data(input_path):
@@ -94,7 +95,7 @@ ax2_2 = ax2.twinx()
 ax2.plot(ind, ssim_loss, 'g-', label='ssim Loss')
 ax2_2.plot(ind, l1_loss, 'r-', label='l1_loss')
 
-ax2.set_xlabel('ind - each 2 batches')
+ax2.set_xlabel('ind - each 10 batches')
 ax2.set_ylabel('ssim_loss data', color='g')
 ax2_2.set_ylabel('l1_loss data', color='r')
 
@@ -109,10 +110,13 @@ for epoch in Epoch_lst:
 ax2_2.axvline(x=epoch, label='epoch', linestyle="dashed", color=new_c)
 
 handles, labels = [], []
-for ax in fig.axes:
-    for h, l in zip(*ax.get_legend_handles_labels()):
-        handles.append(h)
-        labels.append(l)
+
+for h, l in zip(*ax2_2.get_legend_handles_labels()):
+    handles.append(h)
+    labels.append(l)
+for h, l in zip(*ax2.get_legend_handles_labels()):
+    handles.append(h)
+    labels.append(l)
 ax2.legend(handles, labels, loc=1, fontsize=8)
 plt.savefig(output_path)
 plt.show()
