@@ -165,7 +165,7 @@ def main(hyper_params_dict):
     to_print += f" SSIM_WEIGHT = {SSIM_WEIGHT}, L1_WEIGHT = {L1_WEIGHT}, ACCUMULATION_STEPS = {ACCUMULATION_STEPS}"
     to_print += f" NOTES = {NOTES}"
 
-    with open(str(log_dir / date_time + "_log.txt"), "a") as text_file:
+    with open(str(log_dir / (date_time + "_log.txt")), "a") as text_file:
         print(to_print, file=text_file)
 
     try:
@@ -315,13 +315,13 @@ def main(hyper_params_dict):
                 to_print = 'Epoch: [{0}][{1}/{2}]\tTime {batch_time.val:.3f} ({batch_time.sum:.3f})\tETA {eta}\tLoss {loss.val:.4f} ({loss.avg:.4f})'.format(
                     epoch, i, N, batch_time=batch_time, loss=losses, eta=eta)
                 print(to_print)
-                with open(str(log_dir / date_time + "_log.txt"), "a") as text_file:
+                with open(str(log_dir / (date_time + "_log.txt")), "a") as text_file:
                     print(to_print, file=text_file)
 
                 to_print2 = 'Epoch: [{0}][{1}/{2}]\tTime {batch_time.val:.3f} ({batch_time.sum:.3f})\tETA {eta}\tLoss {loss[0]:.4f} ({loss[1]:.4f})'.format(
                     epoch, i, N, batch_time=batch_time, loss=[l_depth.item(), l_ssim.item()], eta=eta)
 
-                with open(str(log_dir / date_time + "_loss_log.txt"), "a") as text_file:
+                with open(str(log_dir / (date_time + "_loss_log.txt")), "a") as text_file:
                     print(to_print2, file=text_file)
 
                 # Log to tensorboard
@@ -396,5 +396,5 @@ if __name__ == '__main__':
     gc.collect()
 
     torch.cuda.empty_cache()
-    with torch.cuda.device(GPU_TO_RUN):
-        main()
+    #with torch.cuda.device(GPU_TO_RUN):
+    main(HYPER_PARAMS)
