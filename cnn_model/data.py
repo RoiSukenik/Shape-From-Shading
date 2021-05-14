@@ -156,7 +156,9 @@ class ToTensor(object):
         image, depth = sample['image'], sample['depth']
 
         ### already resized pics
-        image = image.resize((320, 240))
+        if image.shape[0] != 320:
+            image = image.resize((320, 240))
+
         image = self.to_tensor(image)
 
         depth = depth.resize((160, 120))

@@ -163,9 +163,8 @@ def main(hyper_params_dict):
 
     # Loss
     l1_criterion = nn.L1Loss()
-    to_print = f"Learning Rate = {LEARNING_RATE},  SCHEDULER_STEP_SIZE = {SCHEDULER_STEP_SIZE}, SCHEDULER_GAMMA = {SCHEDULER_GAMMA},"
-    to_print += f" SSIM_WEIGHT = {SSIM_WEIGHT}, L1_WEIGHT = {L1_WEIGHT}, ACCUMULATION_STEPS = {ACCUMULATION_STEPS}"
-    to_print += f" NOTES = {NOTES}"
+
+    to_print = str(hyper_params_dict)
 
     with open(str(log_dir / (date_time + "_log.txt")), "a") as text_file:
         print(to_print, file=text_file)
@@ -397,4 +396,9 @@ if __name__ == '__main__':
     gc.collect()
     torch.cuda.empty_cache()
     with torch.cuda.device(GPU_TO_RUN):
-        main(HYPER_PARAMS)
+
+        for i in range(len(HYPER_PARAMS["LEARNING_RATE"])):
+            curr_hyper_dict = {}
+            for key in HYPER_PARAMS:
+                curr_hyper_dict[key] = HYPER_PARAMS[key][i]
+            main(curr_hyper_dict)

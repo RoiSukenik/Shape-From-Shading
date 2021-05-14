@@ -22,7 +22,7 @@ def loss_graph(log_path):
         last_epoch = 0
         with open(input_path) as f:
             for line in f:
-                if "Learning Rate" in line:
+                if "Learning Rate" in line or "LEARNING_RATE" in line:
                     continue
                 ind.append(ind[-1] + 1)
                 co_line = line[:]

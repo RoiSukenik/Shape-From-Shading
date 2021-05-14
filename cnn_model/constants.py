@@ -5,7 +5,7 @@ CURRENT_DIR = str(pathlib.Path(__file__).parent.absolute())
 """"sfs2_small_face_data sfs2_data sfs2_big_data sfs2_small_pics_data"""
 
 """PATHS & DATA"""
-ZIP_NAME = "sfs2_small_face_data"  # for loading and packaging
+ZIP_NAME = "sfs2_data"  # for loading and packaging
 DATA_PATH_FOR_ZIP = CURRENT_DIR + "/data"
 DATA_TO_TRAIN = CURRENT_DIR + "/" + ZIP_NAME
 LOGS_DIR = str(pathlib.Path(__file__).parent.absolute()) + "/logs/"
@@ -31,8 +31,19 @@ SCHEDULER_GAMMA = 0.1
 NOTES = ""  # NOTES FOR LOG
 ADAPTIVE_LEARNER = True
 
+"""
 HYPER_PARAMS = {"LEARNING_RATE": LEARNING_RATE, "EPOCHS": EPOCHS, "SSIM_WEIGHT": SSIM_WEIGHT, "L1_WEIGHT": L1_WEIGHT,
                 "USE_SCHEDULER": USE_SCHEDULER, "SCHEDULER_STEP_SIZE": SCHEDULER_STEP_SIZE,
                 "SCHEDULER_GAMMA": SCHEDULER_GAMMA, "ACCUMULATION_STEPS": ACCUMULATION_STEPS,
                 "ADAPTIVE_LEARNER": ADAPTIVE_LEARNER}
+"""
 
+HYPER_PARAMS = {"LEARNING_RATE": [0.00001, 0.0001, 0.001],
+                "EPOCHS": [40, 40, 40],
+                "SSIM_WEIGHT": [1.0, 1.0, 1.0],
+                "L1_WEIGHT": [0.1, 0.1, 0.1],
+                "USE_SCHEDULER": [True, True, True],
+                "SCHEDULER_STEP_SIZE": [3, 3, 3],
+                "SCHEDULER_GAMMA": [0.1, 0.1, 0.1],
+                "ACCUMULATION_STEPS": [16, 8, 8],
+                "ADAPTIVE_LEARNER": [True, True, True]}

@@ -1,1 +1,1 @@
-/home/roeematan/PycharmProjects/Shape-From-Shading/cnn_model/results/14052021_205637/log/14052021_205637
+/home/roeematan/PycharmProjects/Shape-From-Shading/cnn_model/results/14052021_211844/log/14052021_211844
