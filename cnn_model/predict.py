@@ -93,7 +93,7 @@ def get_input_img():
     onlyimg = [join(data_dir, f) for f in listdir(data_dir) if isfile(join(data_dir, f))]
     return onlyimg
 
-def plot_output_image_3D(depth_tensor, fname):
+def plot_output_image_3D(depth_tensor, fname, output_path = None):
     depth_width = 120
     depth_height = 160
     outputImageRealWorldScale = depth_tensor.detach().cpu().numpy().reshape(depth_width, depth_height)
@@ -106,7 +106,10 @@ def plot_output_image_3D(depth_tensor, fname):
     ax = fig.add_subplot(111, projection='3d')
     ax.plot_surface(X, Y, outputImageRealWorldScale)
     plt.show()
-    file_path = str(pathlib.Path(__file__).parent.absolute()) + "/mid_train_results/" + fname.split('.')[0]
+    if output_path:
+        file_path = str(output_path / fname.split('.')[0])
+    else:
+        file_path = str(pathlib.Path(__file__).parent.absolute()) + "/mid_train_results/" + fname.split('.')[0]
     if fname == "depth":
         # ax.view_init(elev=10., azim=180) # side view
         file_path = str(pathlib.Path(__file__).parent.absolute()) + "/mid_train_results/" +  f"depth.png"
@@ -120,14 +123,14 @@ def plot_output_image_3D(depth_tensor, fname):
         plt.savefig(file_path)
     plt.close("all")
 
-def show_net_output(output, fname = MODEL_TO_LOAD):
+def show_net_output(output, fname = MODEL_TO_LOAD, output_path = None):
     # output =output / torch.max(output)
     #m = nn.Sigmoid()
     #output = m(output)
-    plot_output_image_3D(output, fname)
+    plot_output_image_3D(output, fname, output_path)
 
 
-def test_predict(model, epoch):
+def test_predict(model, epoch, output_path = None):
     imgs_path = get_input_img()
     sorted_imgs = []
     im1 = [im_path for im_path in imgs_path if "lu" in im_path]
@@ -143,7 +146,7 @@ def test_predict(model, epoch):
         batch = batch.cuda()
         
     output = model(batch)
-    show_net_output(output, f"epoch_{epoch}")
+    show_net_output(output, f"epoch_{epoch}", output_path)
      
      
 def predict():

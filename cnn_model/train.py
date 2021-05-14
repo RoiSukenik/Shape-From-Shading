@@ -2,6 +2,7 @@ import os
 import time
 import argparse
 import datetime
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -10,6 +11,7 @@ import torch.nn.utils as utils
 import torchvision.utils as vutils
 
 import matplotlib
+
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
@@ -21,8 +23,8 @@ try:
     from cnn_model.loss import ssim
     from cnn_model.data import getTrainingTestingData
     from cnn_model.utils import AverageMeter, DepthNorm, colorize
-    from cnn_model.constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, LEARNING_RATE, EPOCHS, VAL_RANGE, LOGS_DIR, \
-        SSIM_WEIGHT, L1_WEIGHT, USE_SCHEDULER, SCHEDULER_STEP_SIZE, SCHEDULER_GAMMA, ACCUMULATION_STEPS, NOTES, ADAPTIVE_LEARNER
+    from cnn_model.constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, LOGS_DIR, NOTES, HYPER_PARAMS
+
     # from cnn_model.loss_rt_graph import start_graph_thread
     # from cnn_model import loss_rt_graph
     from cnn_model.predict import show_net_output, test_predict
@@ -33,8 +35,8 @@ except:
     from loss import ssim
     from data import getTrainingTestingData
     from utils import AverageMeter, DepthNorm, colorize
-    from constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, LEARNING_RATE, EPOCHS, VAL_RANGE, LOGS_DIR, SSIM_WEIGHT, \
-        L1_WEIGHT, USE_SCHEDULER, SCHEDULER_STEP_SIZE, SCHEDULER_GAMMA, ACCUMULATION_STEPS, NOTES, ADAPTIVE_LEARNER
+    from constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, NOTES, HYPER_PARAMS
+
     # from loss_rt_graph import start_graph_thread
     # import loss_rt_graph
     from predict import show_net_output, test_predict
@@ -42,24 +44,23 @@ except:
 
 from torchvision import datasets, transforms
 from torchvision.datasets import MNIST
-import pathlib
 import threading
 import random
 
-# PATH = str(pathlib.Path(__file__).parent.absolute()) + "/saved_model"
+PATH = Path(__file__).parent.absolute()
 # CUDA = False
 CUDA = torch.cuda.is_available()
 
 SAVE_IN_RUN = 0
 GPU_TO_RUN = 3
 
-def save_model(model, train_size, lr, epoch, time):
+
+def save_model(model, output_path, train_size, lr, epoch, time):
     SAVED = False
-    PATH = str(pathlib.Path(__file__).parent.absolute()) + "/saved_model"
     while not SAVED:
         try:
-            model_name =ZIP_NAME + "_" + time + f"_{train_size}_{format(lr, '.2e')}_{epoch}" + ".pth"
-            torch.save(model.state_dict(), os.path.join(PATH,
+            model_name = ZIP_NAME + "_" + time + f"_{train_size}_{format(lr, '.2e')}_{epoch}" + ".pth"
+            torch.save(model.state_dict(), os.path.join(output_path,
                                                         model_name))
             log_name = time + "_log.txt"
             SAVED = True
@@ -78,14 +79,25 @@ def save_model(model, train_size, lr, epoch, time):
                 PATH = input("New Path?")
 
 
-def main():
+def make_run_dir(date_time):
+    curr_path = PATH
+    run_dir = PATH / "results" / date_time
+    model_dir = run_dir / "saved_model"
+    log_dir = run_dir / "log"
+    mid_run_dir = run_dir / "mid_run"
+    run_dir.mkdir(parents=True, exist_ok=True)  # make results folder
+    model_dir.mkdir(parents=True, exist_ok=True)  # make results folder
+    log_dir.mkdir(parents=True, exist_ok=True)  # make results folder
+    mid_run_dir.mkdir(parents=True, exist_ok=True)  # make results folder
+    return run_dir, model_dir, log_dir, mid_run_dir
+
+
+def main(hyper_params_dict):
     # Arguments
     global SAVE_IN_RUN
 
     def save_in_run_thread():
         global SAVE_IN_RUN
-        to_change = 0
-        # while to_change != "y":
         to_change = input("\nStarting Thread - To save model midrun press Enter\n\n")
         now = datetime.datetime.now()  # current date and time
         date_time = now.strftime("%d/%m/%Y_%H%M%S")
@@ -93,6 +105,16 @@ def main():
         print(f"\n[{date_time}] Changed save in run to: {SAVE_IN_RUN}\n")
 
     print(f"Starting TRAIN - GOOD LUCK")
+
+    LEARNING_RATE = hyper_params_dict["LEARNING_RATE"]
+    EPOCHS = hyper_params_dict["EPOCHS"]
+    SSIM_WEIGHT = hyper_params_dict["SSIM_WEIGHT"]
+    L1_WEIGHT = hyper_params_dict["L1_WEIGHT"]
+    USE_SCHEDULER = hyper_params_dict["USE_SCHEDULER"]
+    SCHEDULER_STEP_SIZE = hyper_params_dict["SCHEDULER_STEP_SIZE"]
+    SCHEDULER_GAMMA = hyper_params_dict["SCHEDULER_GAMMA"]
+    ACCUMULATION_STEPS = hyper_params_dict["ACCUMULATION_STEPS"]
+    ADAPTIVE_LEARNER = hyper_params_dict["ADAPTIVE_LEARNER"]
 
     parser = argparse.ArgumentParser(description='High Quality Monocular Depth Estimation via Transfer Learning')
     parser.add_argument('--epochs', default=EPOCHS, type=int, help='number of total epochs to run')
@@ -102,10 +124,14 @@ def main():
 
     # Create model with gpu
     # os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+    now = datetime.datetime.now()  # current date and time
+    date_time = now.strftime("%d%m%Y_%H%M%S")
+
+    run_dir, model_dir, log_dir, mid_run_dir = make_run_dir(date_time)
 
     if CUDA:
         model = Model().cuda()
-        model = nn.DataParallel(model,device_ids=[GPU_TO_RUN])
+        model = nn.DataParallel(model, device_ids=[GPU_TO_RUN])
         model.to(f'cuda:{model.device_ids[0]}')
         print('cuda enable.')
     else:
@@ -126,7 +152,6 @@ def main():
 
     ### ADDED RANDOM BATCHING
     train_loader = [sample_batched for sample_batched in train_loader]
-    # batch_ind_lst = [i for i in range(len(train_loader))]
 
     # Logging
     try:
@@ -136,18 +161,16 @@ def main():
 
     # Loss
     l1_criterion = nn.L1Loss()
-    now = datetime.datetime.now()  # current date and time
-    date_time = now.strftime("%d%m%Y_%H%M%S")
-    to_print = f"Learning Rate = {LEARNING_RATE}, val_range = {VAL_RANGE}, SCHEDULER_STEP_SIZE = {SCHEDULER_STEP_SIZE}, SCHEDULER_GAMMA = {SCHEDULER_GAMMA},"
+    to_print = f"Learning Rate = {LEARNING_RATE},  SCHEDULER_STEP_SIZE = {SCHEDULER_STEP_SIZE}, SCHEDULER_GAMMA = {SCHEDULER_GAMMA},"
     to_print += f" SSIM_WEIGHT = {SSIM_WEIGHT}, L1_WEIGHT = {L1_WEIGHT}, ACCUMULATION_STEPS = {ACCUMULATION_STEPS}"
     to_print += f" NOTES = {NOTES}"
 
-    with open(LOGS_DIR + date_time + "_log.txt", "a") as text_file:
+    with open(str(log_dir / date_time + "_log.txt"), "a") as text_file:
         print(to_print, file=text_file)
 
     try:
         with open("last_log.txt", "w") as text_file:
-            print(date_time , file=text_file)
+            print(date_time, file=text_file)
     except:
         pass
 
@@ -163,7 +186,7 @@ def main():
     mid_save_thread = threading.Thread(target=save_in_run_thread)
     mid_save_thread.start()
     batch_count = 0
-    
+
     for epoch in range(args.epochs):
         batch_time = AverageMeter()
         losses = AverageMeter()
@@ -177,7 +200,7 @@ def main():
         # for i, sample_batched in enumerate(train_loader):
         # WRONG IND 88
         for i, rand_batch_ind in enumerate(batch_ind_lst):
-            batch_count+=1
+            batch_count += 1
             sample_batched = train_loader[rand_batch_ind]
             optimizer.zero_grad()
 
@@ -188,7 +211,6 @@ def main():
             else:
                 image = torch.autograd.Variable(sample_batched['image'])
                 depth = torch.autograd.Variable(sample_batched['depth'])
-
 
             # Normalize depth
             depth_n = DepthNorm(depth)
@@ -211,7 +233,6 @@ def main():
             # plt.imshow(depth[3].permute(1, 2, 0))
             # plt.show()
 
-
             # Predict
             output = model(image)
             if SAVE_IN_RUN:
@@ -224,7 +245,6 @@ def main():
             # one_occour = frequency.sum().item()
             # num_of_elements = torch.numel(depth_n)
             # total_per = (one_occour /num_of_elements) * 100
-
 
             # MASK ATTEMPT
             background = depth_n == 1
@@ -241,8 +261,8 @@ def main():
             # output_masked = torch.reshape(output_masked, (1, 1, 1, new_shape))
 
             ## trial with sigmoid normalize the output
-            #m = nn.Sigmoid()
-            #output_masked = m(output_masked)
+            # m = nn.Sigmoid()
+            # output_masked = m(output_masked)
 
             # depth_n[background] = 0
             # output_masked = output
@@ -254,8 +274,9 @@ def main():
 
             # l_ssim = torch.clamp((1 - ssim(output_masked, depth_masked, val_range=VAL_RANGE)) * 0.5, 0, 1)
 
-            #trial new ssim
-            l_ssim = 1 - ssim(output_masked, depth_masked, data_range=1, size_average=False, nonnegative_ssim=True)  # (N,)
+            # trial new ssim
+            l_ssim = 1 - ssim(output_masked, depth_masked, data_range=1, size_average=False,
+                              nonnegative_ssim=True)  # (N,)
 
             loss = (SSIM_WEIGHT * l_ssim) + (L1_WEIGHT * l_depth)
 
@@ -271,7 +292,6 @@ def main():
                 optimizer.zero_grad()
 
             # optimizer.step()
-
 
             # Measure elapsed time
             batch_time.update(time.time() - end)
@@ -295,13 +315,13 @@ def main():
                 to_print = 'Epoch: [{0}][{1}/{2}]\tTime {batch_time.val:.3f} ({batch_time.sum:.3f})\tETA {eta}\tLoss {loss.val:.4f} ({loss.avg:.4f})'.format(
                     epoch, i, N, batch_time=batch_time, loss=losses, eta=eta)
                 print(to_print)
-                with open(LOGS_DIR + date_time + "_log.txt", "a") as text_file:
+                with open(str(log_dir / date_time + "_log.txt"), "a") as text_file:
                     print(to_print, file=text_file)
 
                 to_print2 = 'Epoch: [{0}][{1}/{2}]\tTime {batch_time.val:.3f} ({batch_time.sum:.3f})\tETA {eta}\tLoss {loss[0]:.4f} ({loss[1]:.4f})'.format(
                     epoch, i, N, batch_time=batch_time, loss=[l_depth.item(), l_ssim.item()], eta=eta)
 
-                with open(LOGS_DIR + date_time + "_loss_log.txt", "a") as text_file:
+                with open(str(log_dir / date_time + "_loss_log.txt"), "a") as text_file:
                     print(to_print2, file=text_file)
 
                 # Log to tensorboard
@@ -317,7 +337,7 @@ def main():
 
             except:
                 pass
-        #show_net_output(output, f"Epoch_{epoch}")
+        # show_net_output(output, f"Epoch_{epoch}")
         test_predict(model, epoch)
         # Record epoch's intermediate results
         if USE_SCHEDULER:
@@ -340,6 +360,8 @@ def main():
     save_model(model, N, LEARNING_RATE, epoch, date_time)
 
     os._exit(1)
+
+
 try:
     def LogProgress(model, writer, test_loader, epoch):
         model.eval()
@@ -374,6 +396,5 @@ if __name__ == '__main__':
     gc.collect()
 
     torch.cuda.empty_cache()
-
     with torch.cuda.device(GPU_TO_RUN):
         main()
