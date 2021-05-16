@@ -13,6 +13,10 @@ try:
 except:
     from model import Model
     from utils import show_tensor_img
+import matplotlib
+matplotlib.use('Agg')
+
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d
 import torch.nn as nn
@@ -106,7 +110,6 @@ def plot_output_image_3D(depth_tensor, fname, output_path = None):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.plot_surface(X, Y, outputImageRealWorldScale)
-    plt.show()
     if output_path:
         file_path = str(output_path / fname.split('.')[0])
     else:
@@ -119,6 +122,7 @@ def plot_output_image_3D(depth_tensor, fname, output_path = None):
         ax.view_init(elev=10, azim=180)
         file_path = str(pathlib.Path(__file__).parent.absolute()) + "/mid_train_results/" +  f"depth{180}.png"
         plt.savefig(file_path)
+        #plt.show()
     else:
         # ax.view_init(elev=10., azim=180) # side view
         plt.savefig(file_path)

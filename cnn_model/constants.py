@@ -1,11 +1,17 @@
 import pathlib
+import random
+import torch
 
 CURRENT_DIR = str(pathlib.Path(__file__).parent.absolute())
 
-""""sfs2_small_face_data sfs2_data sfs2_big_data sfs2_small_pics_data"""
+CUDA = torch.cuda.is_available()
+NET_MIDSAVE_THREAD = False
+SAVE_MODEL = False
+GPU_TO_RUN = [0]
 
+""""sfs2_small_face_data sfs2_data sfs2_big_data sfs2_small_pics_data"""
 """PATHS & DATA"""
-ZIP_NAME = "sfs2_data"  # for loading and packaging
+ZIP_NAME = "sfs2_small_pics_data"  # for loading and packaging
 DATA_PATH_FOR_ZIP = CURRENT_DIR + "/data"
 DATA_TO_TRAIN = CURRENT_DIR + "/" + ZIP_NAME
 LOGS_DIR = str(pathlib.Path(__file__).parent.absolute()) + "/logs/"
@@ -36,14 +42,27 @@ HYPER_PARAMS = {"LEARNING_RATE": LEARNING_RATE, "EPOCHS": EPOCHS, "SSIM_WEIGHT":
                 "USE_SCHEDULER": USE_SCHEDULER, "SCHEDULER_STEP_SIZE": SCHEDULER_STEP_SIZE,
                 "SCHEDULER_GAMMA": SCHEDULER_GAMMA, "ACCUMULATION_STEPS": ACCUMULATION_STEPS,
                 "ADAPTIVE_LEARNER": ADAPTIVE_LEARNER}
-"""
 
-HYPER_PARAMS = {"LEARNING_RATE": [0.00001, 0.0001, 0.001],
-                "EPOCHS": [40, 40, 40],
-                "SSIM_WEIGHT": [1.0, 1.0, 1.0],
-                "L1_WEIGHT": [0.1, 0.1, 0.1],
-                "USE_SCHEDULER": [True, True, True],
-                "SCHEDULER_STEP_SIZE": [3, 3, 3],
-                "SCHEDULER_GAMMA": [0.1, 0.1, 0.1],
-                "ACCUMULATION_STEPS": [16, 8, 8],
-                "ADAPTIVE_LEARNER": [True, True, True]}
+HYPER_PARAMS = {"LEARNING_RATE": [0.00001],
+                "EPOCHS": [1],
+                "SSIM_WEIGHT": [1.0],
+                "L1_WEIGHT": [0.1],
+                "USE_SCHEDULER": [True],
+                "SCHEDULER_STEP_SIZE": [3],
+                "SCHEDULER_GAMMA": [0.1],
+                "ACCUMULATION_STEPS": [16],
+                "ADAPTIVE_LEARNER": [True]}
+
+
+"""
+RUNS = 80
+SSIM_WEIGHT_lst = [round(random.uniform(1.0, 1.1), 2) for i in range(RUNS)]
+HYPER_PARAMS = {"LEARNING_RATE": [round(random.uniform(0.000001, 0.0001), 6) for i in range(RUNS)],
+                "EPOCHS": [40 for i in range(RUNS)],
+                "SSIM_WEIGHT": SSIM_WEIGHT_lst,
+                "L1_WEIGHT": [round(1.11 - ssim_l, 2) for ssim_l in SSIM_WEIGHT_lst],
+                "USE_SCHEDULER": [1-(True * (i % 5 == 0)) for i in range(RUNS)],
+                "SCHEDULER_STEP_SIZE": [random.randint(1, 3) for i in range(RUNS)],
+                "SCHEDULER_GAMMA": [round(random.uniform(0.01, 0.1), 2) for i in range(RUNS)],
+                "ACCUMULATION_STEPS": [random.randint(4, 16) for i in range(RUNS)],
+                "ADAPTIVE_LEARNER": [1-(True * (i % 2 == 0)) for i in range(RUNS)]}

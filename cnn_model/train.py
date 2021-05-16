@@ -9,11 +9,8 @@ import torch
 import torch.nn as nn
 import torch.nn.utils as utils
 import torchvision.utils as vutils
-
 import matplotlib
-
-
-matplotlib.use('agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 # from tensorboardX import SummaryWriter
@@ -24,7 +21,7 @@ try:
     from cnn_model.loss import ssim
     from cnn_model.data import getTrainingTestingData
     from cnn_model.utils import AverageMeter, DepthNorm, colorize
-    from cnn_model.constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, LOGS_DIR, NOTES, HYPER_PARAMS
+    from cnn_model.constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, LOGS_DIR, NOTES, HYPER_PARAMS, CUDA, GPU_TO_RUN, NET_MIDSAVE_THREAD, SAVE_MODEL
     from cnn_model.log_visualize import loss_graph
 
     # from cnn_model.loss_rt_graph import start_graph_thread
@@ -37,7 +34,7 @@ except:
     from loss import ssim
     from data import getTrainingTestingData
     from utils import AverageMeter, DepthNorm, colorize
-    from constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, NOTES, HYPER_PARAMS
+    from constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, NOTES, HYPER_PARAMS, CUDA, GPU_TO_RUN, NET_MIDSAVE_THREAD, SAVE_MODEL
     from log_visualize import loss_graph
 
     # from loss_rt_graph import start_graph_thread
@@ -50,13 +47,11 @@ from torchvision.datasets import MNIST
 import threading
 import random
 
-PATH = Path(__file__).parent.absolute()
-# CUDA = False
-CUDA = torch.cuda.is_available()
 
-MULTI_RUNS = True
-SAVE_IN_RUN = 0
-GPU_TO_RUN = 3
+# CUDA = False
+
+PATH = Path(__file__).parent.absolute()
+SAVE_IN_RUN = 0 #GLOBAL FOR MIDTRAIN SAVE
 
 
 def save_model(model, output_path, train_size, lr, epoch, time):
@@ -70,7 +65,7 @@ def save_model(model, output_path, train_size, lr, epoch, time):
             SAVED = True
 
             with open("last_model.txt", "w") as text_file:
-                print(str(os.path.join(output_path,model_name)), file=text_file)
+                print(str(os.path.join(output_path, model_name)), file=text_file)
 
             print(f"MODEL SAVED SUCSSEFFULLY IN:\n{model_name}")
             print(f"Log name is:\n{log_name}")
@@ -83,8 +78,10 @@ def save_model(model, output_path, train_size, lr, epoch, time):
                 PATH = input("New Path?")
 
 
-def make_run_dir(date_time):
-    run_dir = PATH / "results" / date_time
+
+def make_run_dir(date_time, run_start_time):
+    run_dir = PATH / "results" / (ZIP_NAME + '_' +run_start_time) /date_time
+    plot_dir = run_dir.parent / "loss_plots"
     model_dir = run_dir / "saved_model"
     log_dir = run_dir / "log"
     mid_run_dir = run_dir / "mid_run"
@@ -92,11 +89,13 @@ def make_run_dir(date_time):
     model_dir.mkdir(parents=True, exist_ok=True)  # make results folder
     log_dir.mkdir(parents=True, exist_ok=True)  # make results folder
     mid_run_dir.mkdir(parents=True, exist_ok=True)  # make results folder
+    plot_dir.mkdir(parents=True, exist_ok=True)  # make results folder
     return run_dir, model_dir, log_dir, mid_run_dir
 
 
-def main(hyper_params_dict):
+def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
     # Arguments
+
     global SAVE_IN_RUN
 
     def save_in_run_thread():
@@ -130,11 +129,11 @@ def main(hyper_params_dict):
     now = datetime.datetime.now()  # current date and time
     date_time = now.strftime("%d%m%Y_%H%M%S")
 
-    run_dir, model_dir, log_dir, mid_run_dir = make_run_dir(date_time)
+    run_dir, model_dir, log_dir, mid_run_dir = make_run_dir(date_time, run_start_time)
 
     if CUDA:
         model = Model().cuda()
-        model = nn.DataParallel(model, device_ids=[GPU_TO_RUN])
+        model = nn.DataParallel(model, device_ids=GPU_TO_RUN)
         model.to(f'cuda:{model.device_ids[0]}')
         print('cuda enable.')
     else:
@@ -149,12 +148,10 @@ def main(hyper_params_dict):
     prefix = 'densenet_' + str(batch_size)
 
     # Load data
-    train_loader, test_loader = getTrainingTestingData(batch_size=batch_size)
-    test_loader = 0
+
     N = len(train_loader)
 
     ### ADDED RANDOM BATCHING
-    train_loader = [sample_batched for sample_batched in train_loader]
 
     # Logging
     try:
@@ -185,7 +182,7 @@ def main(hyper_params_dict):
             scheduler = StepLR(optimizer, step_size=SCHEDULER_STEP_SIZE, gamma=SCHEDULER_GAMMA)
     # Start training...
 
-    if not MULTI_RUNS:
+    if NET_MIDSAVE_THREAD:
         mid_save_thread = threading.Thread(target=save_in_run_thread)
         mid_save_thread.start()
     batch_count = 0
@@ -240,7 +237,7 @@ def main(hyper_params_dict):
             output = model(image)
             if SAVE_IN_RUN:
                 print("Saving Model:")
-                save_model(model,model_dir, N, LEARNING_RATE, epoch, date_time)
+                save_model(model, model_dir, N, LEARNING_RATE, epoch, date_time)
                 SAVE_IN_RUN = 0
                 threading.Thread(target=save_in_run_thread).start()
 
@@ -360,9 +357,13 @@ def main(hyper_params_dict):
         except:
             pass
     epoch = args.epochs
-    loss_graph(str(log_dir / date_time))
-    if not MULTI_RUNS:
+    test_predict(model, epoch, run_dir)
+    loss_graph(str(log_dir / date_time), hyper_params_dict, output_path2=str(run_dir / date_time))
+
+    
+    if SAVE_MODEL:
         save_model(model, model_dir, N, LEARNING_RATE, epoch, date_time)
+    if NET_MIDSAVE_THREAD:
         os._exit(1)
 
 
@@ -398,10 +399,15 @@ if __name__ == '__main__':
     import gc
     gc.collect()
     torch.cuda.empty_cache()
-    with torch.cuda.device(GPU_TO_RUN):
-
+    with torch.cuda.device(GPU_TO_RUN[0]):
+        train_loader, test_loader = getTrainingTestingData(batch_size=4)
+        train_loader = [sample_batched for sample_batched in train_loader]
+        now = datetime.datetime.now()  # current date and time
+        date_time = now.strftime("%d%m%Y_%H%M%S")
         for i in range(len(HYPER_PARAMS["LEARNING_RATE"])):
+            print(f"\nRun Number: {i}\n")
             curr_hyper_dict = {}
             for key in HYPER_PARAMS:
                 curr_hyper_dict[key] = HYPER_PARAMS[key][i]
-            main(curr_hyper_dict)
+
+            main(curr_hyper_dict, train_loader,0, date_time)

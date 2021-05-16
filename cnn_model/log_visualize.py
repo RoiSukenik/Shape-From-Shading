@@ -1,12 +1,13 @@
 import datetime
+from os.path import basename
+from pathlib import Path
 
 import numpy as np
 
 import matplotlib.pyplot as plt
-import pathlib
 
 
-def loss_graph(log_path):
+def loss_graph(log_path, params = None, output_path2 = None):
     diff_loss_file = log_path + "_loss_log.txt"
     avg_loss_file = log_path + "_log.txt"
 
@@ -52,7 +53,15 @@ def loss_graph(log_path):
 
     fig, (ax1, ax2) = plt.subplots(2, sharex=True)
 
-    ax1.set_title(f'Loss Graph - {log_path}')
+    if params:
+      
+      tit = r"$\bf{" + f'Loss Graph - {basename(Path(log_path)).replace("_","-")}' + "}$\n"
+      tit += f'lr: {params["LEARNING_RATE"]}, ssim: {params["SSIM_WEIGHT"]}, l1: {params["L1_WEIGHT"]}, Accumulation: {params["ACCUMULATION_STEPS"]}\n'
+      tit += f'Scheduler: {params["USE_SCHEDULER"]}, Step Size: {params["SCHEDULER_STEP_SIZE"]}, Gamma: {params["SCHEDULER_GAMMA"]}, '
+      tit += f'Adaptive: {params["ADAPTIVE_LEARNER"]}'
+      ax1.set_title(tit)
+    else:
+      ax1.set_title(f'Loss Graph - {basename(Path(log_path))}')
 
     ax1_2 = ax1.twinx()
     ax1.plot(ind, Loss_lst, 'g-', label='Loss')
@@ -112,6 +121,9 @@ def loss_graph(log_path):
         labels.append(l)
     ax2.legend(handles, labels, loc=1, fontsize=8)
     plt.savefig(output_path)
+    plt.savefig(str(Path(log_path).parent.parent.parent / "loss_plots" / basename(Path(log_path))))
+    if output_path2:
+        plt.savefig(output_path2)
 
 
 if __name__ == '__main__':
