@@ -4,7 +4,7 @@ import numpy as np
 from os import listdir
 from os.path import isfile, join
 import torch
-
+from os.path import basename
 from pathlib import Path
 
 try:
@@ -33,6 +33,7 @@ except Exception as e:
 #MODEL_TO_LOAD = "sfs2_small_pics_data_12052021_222948_101_1.00e-06_50.pth"
 TEST_DIR = "/small_test_dir"
 BIG_PICS = True if "small" not in TEST_DIR else False
+SAVE_CSV = True
 
 def _is_pil_image(img):
     return isinstance(img, Image.Image)
@@ -98,29 +99,49 @@ def get_input_img():
     onlyimg = [join(data_dir, f) for f in listdir(data_dir) if isfile(join(data_dir, f))]
     return onlyimg
 
-def plot_output_image_3D(depth_tensor, fname, output_path = None):
+def plot_output_image_3D(depth_tensor, fname, output_path = None, params = None):
     depth_width = 120
     depth_height = 160
     outputImageRealWorldScale = depth_tensor.detach().cpu().numpy().reshape(depth_width, depth_height)
     outputImageRealWorldScale = (20 * depth_tensor) + 10
     outputImageRealWorldScale = outputImageRealWorldScale.detach().cpu().numpy().reshape(depth_width, depth_height)
+
+
     xx = range(depth_height)
     yy = range(depth_width)
     X, Y = np.meshgrid(xx, yy)
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
+    if params:
+        tit = f'lr: {params["LEARNING_RATE"]}, ssim: {params["SSIM_WEIGHT"]}, l1: {params["L1_WEIGHT"]}, Accumulation: {params["ACCUMULATION_STEPS"]}\n'
+        tit += f'Scheduler: {params["USE_SCHEDULER"]}, Step Size: {params["SCHEDULER_STEP_SIZE"]}, Gamma: {params["SCHEDULER_GAMMA"]}, '
+        tit += f'Adaptive: {params["ADAPTIVE_LEARNER"]}'
+    else:
+        tit = fname.split('.')[0]
+    ax.set_title(tit)
     ax.plot_surface(X, Y, outputImageRealWorldScale)
     if output_path:
         file_path = str(output_path / fname.split('.')[0])
+        if "mid_run" not in str(output_path):
+            if SAVE_CSV:
+                a = np.asarray(outputImageRealWorldScale)
+                np.savetxt(file_path + ".csv", a, delimiter=",")
+            run_id = str(basename(output_path))
+            plt.savefig(str(output_path.parent/ "predict" / run_id))
     else:
-        file_path = str(pathlib.Path(__file__).parent.absolute()) + "/mid_train_results/" + fname.split('.')[0]
+        file_path = str(Path(__file__).parent.absolute()) + "/mid_train_results/" + fname.split('.')[0]
+
     if fname == "depth":
+        if SAVE_CSV:
+            a = np.asarray(outputImageRealWorldScale)
+            np.savetxt(str(Path(__file__).parent.absolute()) + "/mid_train_results/" +  f"depth.csv", a, delimiter=",")
+        
         # ax.view_init(elev=10., azim=180) # side view
-        file_path = str(pathlib.Path(__file__).parent.absolute()) + "/mid_train_results/" +  f"depth.png"
+        file_path = str(Path(__file__).parent.absolute()) + "/mid_train_results/" +  f"depth.png"
         plt.savefig(file_path)
         
         ax.view_init(elev=10, azim=180)
-        file_path = str(pathlib.Path(__file__).parent.absolute()) + "/mid_train_results/" +  f"depth{180}.png"
+        file_path = str(Path(__file__).parent.absolute()) + "/mid_train_results/" +  f"depth{180}.png"
         plt.savefig(file_path)
         #plt.show()
     else:
@@ -128,14 +149,14 @@ def plot_output_image_3D(depth_tensor, fname, output_path = None):
         plt.savefig(file_path)
     plt.close("all")
 
-def show_net_output(output, fname = MODEL_TO_LOAD, output_path = None):
+def show_net_output(output, fname = MODEL_TO_LOAD, output_path = None, params = None):
     # output =output / torch.max(output)
     #m = nn.Sigmoid()
     #output = m(output)
-    plot_output_image_3D(output, fname, output_path)
+    plot_output_image_3D(output, fname, output_path, params)
 
 
-def test_predict(model, epoch, output_path = None):
+def test_predict(model, epoch, output_path = None, params = None):
     imgs_path = get_input_img()
     sorted_imgs = []
     im1 = [im_path for im_path in imgs_path if "lu" in im_path]
@@ -151,7 +172,7 @@ def test_predict(model, epoch, output_path = None):
         batch = batch.cuda()
         
     output = model(batch)
-    show_net_output(output, f"epoch_{epoch}", output_path)
+    show_net_output(output, f"epoch_{epoch:02d}", output_path, params)
      
      
 def predict():

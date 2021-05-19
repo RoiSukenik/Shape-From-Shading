@@ -1,3 +1,8 @@
+import os
+from os.path import basename
+from pathlib import Path
+from shutil import copyfile
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.cm
@@ -52,3 +57,25 @@ def colorize(value, vmin=10, vmax=1000, cmap='plasma'):
 def show_tensor_img(tensor_img):
     plt.imshow(tensor_img.permute(1, 2, 0))
     plt.show()
+
+
+def find_files_in_path(path, query, MAX_DEPTH = 10):
+    results =[]
+    for root, dirs, files in os.walk(path, topdown=True):
+        if root.count(os.sep) - path.count(os.sep) == MAX_DEPTH - 1:
+            del dirs[:]
+        for name in files:
+            if query in name:
+                results.append(os.path.join(root, name))
+    return results
+
+def copy_files(src,dest,query,depth = 2):
+    a = find_files_in_path(src, query, depth)
+    for img in a:
+        file_new_name = basename(Path(img).parent)
+        copyfile(img, str(Path(dest)/(file_new_name+".png")))
+
+src = r"/home/roeematan/PycharmProjects/Shape-From-Shading/cnn_model/results/sfs2_small_pics_data_16052021_145154"
+dest = r"/home/roeematan/PycharmProjects/Shape-From-Shading/cnn_model/results/sfs2_small_pics_data_16052021_145154/predict"
+
+copy_files(src,dest,"epoch")

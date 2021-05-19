@@ -7,11 +7,16 @@ CURRENT_DIR = str(pathlib.Path(__file__).parent.absolute())
 CUDA = torch.cuda.is_available()
 NET_MIDSAVE_THREAD = False
 SAVE_MODEL = False
-GPU_TO_RUN = [0]
+GPU_TO_RUN = [1]
+
+TEST = 0
+
 
 """"sfs2_small_face_data sfs2_data sfs2_big_data sfs2_small_pics_data"""
 """PATHS & DATA"""
 ZIP_NAME = "sfs2_small_pics_data"  # for loading and packaging
+if TEST:
+    ZIP_NAME = "sfs2_data"  
 DATA_PATH_FOR_ZIP = CURRENT_DIR + "/data"
 DATA_TO_TRAIN = CURRENT_DIR + "/" + ZIP_NAME
 LOGS_DIR = str(pathlib.Path(__file__).parent.absolute()) + "/logs/"
@@ -44,7 +49,7 @@ HYPER_PARAMS = {"LEARNING_RATE": LEARNING_RATE, "EPOCHS": EPOCHS, "SSIM_WEIGHT":
                 "ADAPTIVE_LEARNER": ADAPTIVE_LEARNER}
 
 HYPER_PARAMS = {"LEARNING_RATE": [0.00001],
-                "EPOCHS": [1],
+                "EPOCHS": [10],
                 "SSIM_WEIGHT": [1.0],
                 "L1_WEIGHT": [0.1],
                 "USE_SCHEDULER": [True],
@@ -56,9 +61,12 @@ HYPER_PARAMS = {"LEARNING_RATE": [0.00001],
 
 """
 RUNS = 80
+EPOCHS_CONST = 40
+if TEST:
+    EPOCHS_CONST = 2
 SSIM_WEIGHT_lst = [round(random.uniform(1.0, 1.1), 2) for i in range(RUNS)]
 HYPER_PARAMS = {"LEARNING_RATE": [round(random.uniform(0.000001, 0.0001), 6) for i in range(RUNS)],
-                "EPOCHS": [40 for i in range(RUNS)],
+                "EPOCHS": [EPOCHS_CONST for i in range(RUNS)],
                 "SSIM_WEIGHT": SSIM_WEIGHT_lst,
                 "L1_WEIGHT": [round(1.11 - ssim_l, 2) for ssim_l in SSIM_WEIGHT_lst],
                 "USE_SCHEDULER": [1-(True * (i % 5 == 0)) for i in range(RUNS)],

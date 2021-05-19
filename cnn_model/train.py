@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 # from tensorboardX import SummaryWriter
 from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
 
+RESUME_RUN = "16052021_145154"
+
 try:
     from cnn_model.model import Model
     from cnn_model.loss import ssim
@@ -59,8 +61,7 @@ def save_model(model, output_path, train_size, lr, epoch, time):
     while not SAVED:
         try:
             model_name = ZIP_NAME + "_" + time + f"_{train_size}_{format(lr, '.2e')}_{epoch}" + ".pth"
-            torch.save(model.state_dict(), os.path.join(output_path,
-                                                        model_name))
+            torch.save(model.state_dict(), str(output_path / model_name))
             log_name = time + "_log.txt"
             SAVED = True
 
@@ -82,6 +83,7 @@ def save_model(model, output_path, train_size, lr, epoch, time):
 def make_run_dir(date_time, run_start_time):
     run_dir = PATH / "results" / (ZIP_NAME + '_' +run_start_time) /date_time
     plot_dir = run_dir.parent / "loss_plots"
+    predict_dir = run_dir.parent / "predict"
     model_dir = run_dir / "saved_model"
     log_dir = run_dir / "log"
     mid_run_dir = run_dir / "mid_run"
@@ -90,6 +92,7 @@ def make_run_dir(date_time, run_start_time):
     log_dir.mkdir(parents=True, exist_ok=True)  # make results folder
     mid_run_dir.mkdir(parents=True, exist_ok=True)  # make results folder
     plot_dir.mkdir(parents=True, exist_ok=True)  # make results folder
+    predict_dir.mkdir(parents=True, exist_ok=True)  # make results folder
     return run_dir, model_dir, log_dir, mid_run_dir
 
 
@@ -357,7 +360,7 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
         except:
             pass
     epoch = args.epochs
-    test_predict(model, epoch, run_dir)
+    test_predict(model, epoch, run_dir, hyper_params_dict)
     loss_graph(str(log_dir / date_time), hyper_params_dict, output_path2=str(run_dir / date_time))
 
     
@@ -365,6 +368,8 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
         save_model(model, model_dir, N, LEARNING_RATE, epoch, date_time)
     if NET_MIDSAVE_THREAD:
         os._exit(1)
+    return model
+
 
 
 try:
@@ -400,14 +405,21 @@ if __name__ == '__main__':
     gc.collect()
     torch.cuda.empty_cache()
     with torch.cuda.device(GPU_TO_RUN[0]):
+        print(torch.cuda.memory_allocated(GPU_TO_RUN[0]))
         train_loader, test_loader = getTrainingTestingData(batch_size=4)
         train_loader = [sample_batched for sample_batched in train_loader]
         now = datetime.datetime.now()  # current date and time
         date_time = now.strftime("%d%m%Y_%H%M%S")
+        if RESUME_RUN:
+            date_time = RESUME_RUN
         for i in range(len(HYPER_PARAMS["LEARNING_RATE"])):
             print(f"\nRun Number: {i}\n")
             curr_hyper_dict = {}
             for key in HYPER_PARAMS:
                 curr_hyper_dict[key] = HYPER_PARAMS[key][i]
+            model = main(curr_hyper_dict, train_loader,0, date_time)
 
-            main(curr_hyper_dict, train_loader,0, date_time)
+            del model
+            gc.collect()
+            torch.cuda.empty_cache()
+
