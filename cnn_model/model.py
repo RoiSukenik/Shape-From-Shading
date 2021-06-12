@@ -3,6 +3,17 @@ import torch.nn as nn
 from torchvision import models
 import torch.nn.functional as F
 
+try:
+    from cnn_model.constants import LS_AMOUNT, MERGE_METHOD
+except:
+    from constants import LS_AMOUNT, MERGE_METHOD
+
+
+if MERGE_METHOD == "concat":
+    DECODER_INPUT = 4
+else:
+    DECODER_INPUT = 1
+
 
 class UpSample(nn.Sequential):
     def __init__(self, skip_input, output_features):
@@ -16,28 +27,39 @@ class UpSample(nn.Sequential):
         up_x = F.interpolate(x, size=[concat_with.size(2), concat_with.size(3)], mode='bilinear', align_corners=True)
         return self.leakyreluB( self.convB( self.convA( torch.cat([up_x, concat_with], dim=1)  ) )  )
 
+
 class Decoder(nn.Module):
     # noinspection PyTypeChecker
-    def __init__(self, num_features=1664*4, decoder_width = 1.0):
+    def __init__(self, num_features=1664*DECODER_INPUT, decoder_width = 1.0):
         super(Decoder, self).__init__()
         features = int(num_features * decoder_width)
         self.conv2 = nn.Conv2d(num_features, features, kernel_size=1, stride=1, padding=0)
 
-        self.up1 = UpSample(skip_input=features//1 + 256*4, output_features=features//2)
-        self.up2 = UpSample(skip_input=features//2 + 128*4,  output_features=features//4)
-        self.up3 = UpSample(skip_input=features//4 + 64*4,  output_features=features//8)
-        self.up4 = UpSample(skip_input=features//8 + 64*4,  output_features=features//16)
+        self.up1 = UpSample(skip_input=features//1 + 256*DECODER_INPUT, output_features=features//2)
+        self.up2 = UpSample(skip_input=features//2 + 128*DECODER_INPUT,  output_features=features//4)
+        self.up3 = UpSample(skip_input=features//4 + 64*DECODER_INPUT,  output_features=features//8)
+        self.up4 = UpSample(skip_input=features//8 + 64*DECODER_INPUT,  output_features=features//16)
 
         self.conv3 = nn.Conv2d(features//16, 1, kernel_size=3, stride=1, padding=1)
 
     def forward(self, features):
         x_block0, x_block1, x_block2, x_block3, x_block4 = features[3], features[4], features[6], features[8], features[12]
 
-        x_block0 = torch.reshape(x_block0, (1,4*x_block0.shape[1],x_block0.shape[2],x_block0.shape[3]))
-        x_block1 = torch.reshape(x_block1, (1,4*x_block1.shape[1],x_block1.shape[2],x_block1.shape[3]))
-        x_block2 = torch.reshape(x_block2, (1,4*x_block2.shape[1],x_block2.shape[2],x_block2.shape[3]))
-        x_block3 = torch.reshape(x_block3, (1,4*x_block3.shape[1],x_block3.shape[2],x_block3.shape[3]))
-        x_block4 = torch.reshape(x_block4, (1,4*x_block4.shape[1],x_block4.shape[2],x_block4.shape[3]))
+        if MERGE_METHOD == "concat":
+            x_block0 = torch.reshape(x_block0, (1, x_block0.shape[1]*x_block0.shape[2], x_block0.shape[3], x_block0.shape[4]))
+            x_block1 = torch.reshape(x_block1, (1,x_block1.shape[1]*x_block1.shape[2], x_block1.shape[3], x_block1.shape[4]))
+            x_block2 = torch.reshape(x_block2, (1, x_block2.shape[1]*x_block2.shape[2], x_block2.shape[3], x_block2.shape[4]))
+            x_block3 = torch.reshape(x_block3, (1,  x_block3.shape[1]*x_block3.shape[2], x_block3.shape[3], x_block3.shape[4]))
+            x_block4 = torch.reshape(x_block4, (1, x_block4.shape[1]*x_block4.shape[2], x_block4.shape[3], x_block4.shape[4]))
+        else:
+            x_block0 = torch.mean(x_block0, 0, True)
+            x_block1 = torch.mean(x_block1, 0, True)
+            x_block2 = torch.mean(x_block2, 0, True)
+            x_block3 = torch.mean(x_block3, 0, True)
+            x_block4 = torch.mean(x_block4, 0, True)
+
+
+
 
         x_d0 = self.conv2(F.relu(x_block4))
         x_d1 = self.up1(x_d0, x_block3)
@@ -63,7 +85,14 @@ class Model(nn.Module):
         self.decoder = Decoder()
 
     def forward(self, x):
-        x =  self.encoder(x)
-
-        return self.decoder( x )
+        N, M, C, H, W = x.size()
+        a = x.view(N * M, C, H, W)
+        x =  self.encoder(a)
+        ## X is list of features = 13
+        new_lst =[]
+        for f in x:
+            Nn, Cn, Hn, Wn = f.size()
+            f = f.view(N, M, Cn, Hn, Wn)
+            new_lst.append(f)
+        return self.decoder(new_lst)
 

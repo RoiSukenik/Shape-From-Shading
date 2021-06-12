@@ -4,7 +4,7 @@ from pathlib import Path
 from shutil import copyfile
 
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import matplotlib.cm
 import numpy as np
 import matplotlib.pyplot as plt

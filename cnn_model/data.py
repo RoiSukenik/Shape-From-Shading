@@ -12,6 +12,10 @@ from os import listdir
 from os.path import isfile, join
 from pathlib import Path
 
+DIV_FACTOR = 2
+ORG_IM_DIM = (640, 480)
+IM_DIM = (int(ORG_IM_DIM[0]/DIV_FACTOR),int(ORG_IM_DIM[1]/DIV_FACTOR))
+DEPTH_DIM = (int(IM_DIM[0]/2),int(IM_DIM[1]/2))
 try:
     from cnn_model.constants import MIN_DEPTH, MAX_DEPTH, DATA_NAME, DATA_PATH
 
@@ -107,6 +111,8 @@ def loadZipToMem(zip_file):
     data = {name: input_zip.read(name) for name in input_zip.namelist()}
     nyu2_train = list(
         (row.split(',') for row in (data['data/' + DATA_NAME + '_train.csv']).decode("utf-8").split('\n') if len(row) > 0))
+    nyu2_test = list(
+        (row.split(',') for row in (data['data/' + DATA_NAME + '_test.csv']).decode("utf-8").split('\n') if len(row) > 0))
 
     from sklearn.utils import shuffle
     # nyu2_train = shuffle(nyu2_train, random_state=0)
@@ -114,33 +120,47 @@ def loadZipToMem(zip_file):
     # if True: nyu2_train = nyu2_train[:40]
 
     print('Loaded ({0}).'.format(len(nyu2_train)))
-    return data, nyu2_train
+    return data, nyu2_train, nyu2_test
 
 
 class depthDatasetMemory(Dataset):
     def __init__(self, data, nyu2_train, transform=None):
         self.data, self.nyu_dataset = data, nyu2_train
+        joined_list = []
+        tmp_lst = []
+
+        for i, data in enumerate(nyu2_train):
+
+            if i%3==0 and i!=0:
+                tmp_lst.append(data[0])
+                tmp_lst.append(data[1])
+                joined_list.append(tmp_lst)
+                tmp_lst = []
+            tmp_lst.append(data[0])
+        self.nyu_dataset = joined_list
         self.transform = transform
 
     def __getitem__(self, idx):
         sample = self.nyu_dataset[idx]
-        sample[0] = sample[0].replace('\\','/')
-        sample[1] = sample[1].replace('\\','/')
-        sample[1] = sample[1].replace('\r','')
-        image = Image.open(BytesIO(self.data[sample[0]]))
-        depth = Image.open(BytesIO(self.data[sample[1]]))
+        im_lst = []
+        for im in sample:
+            im = im.replace('\\', '/')
+            if "depth" in im:
+                im = im.replace('\r', '')
 
-        img = image.convert('L')
-        np_img = np.array(img, dtype=np.uint8)
-        np_img = np.dstack([np_img, np_img, np_img])
-        np_img = Image.fromarray(np_img, 'RGB')
+            img = Image.open(BytesIO(self.data[im]))
+            img = img.convert('L')
+            np_img = np.array(img, dtype=np.uint8)
+            np_img = np.dstack([np_img, np_img, np_img])
+            np_img = Image.fromarray(np_img, 'RGB')
 
-        dep = depth.convert('L')
-        np_dep = np.array(dep, dtype=np.uint8)
-        np_dep = np.dstack([np_dep, np_dep, np_dep])
-        np_dep = Image.fromarray(np_dep, 'RGB')
+            if "depth" in im:
+                np_dep = np_img
+            else:
+                im_lst.append(np_img)
 
-        sample = {'image': np_img, 'depth': np_dep}
+
+        sample = {'image': im_lst, 'depth': np_dep}
         if self.transform: sample = self.transform(sample)
         return sample
 
@@ -153,15 +173,16 @@ class ToTensor(object):
         self.is_test = is_test
 
     def __call__(self, sample):
-        image, depth = sample['image'], sample['depth']
+        images, depth = sample['image'], sample['depth']
 
         ### already resized pics
-        if image.width != 320:
-            image = image.resize((320, 240))
-
-        image = self.to_tensor(image)
-
-        depth = depth.resize((160, 120))
+        im_lst = []
+        for image in images:
+            image = image.resize(IM_DIM)
+            image = self.to_tensor(image)
+            im_lst.append(image)
+        im_tensors = torch.stack(im_lst)
+        depth = depth.resize(DEPTH_DIM)
         if self.is_test:
             depth = self.to_tensor(depth).float() /int(MAX_DEPTH)
         else:
@@ -170,7 +191,7 @@ class ToTensor(object):
         # put in expected range
         depth = torch.clamp(depth, int(MIN_DEPTH),int(MAX_DEPTH))
 
-        return {'image': image, 'depth': depth}
+        return {'image': im_tensors, 'depth': depth}
 
     def to_tensor(self, pic):
         if not (_is_pil_image(pic) or _is_numpy_image(pic)):
@@ -198,8 +219,10 @@ class ToTensor(object):
         else:
             nchannel = len(pic.mode)
         img = img.view(pic.size[1], pic.size[0], nchannel)
-
         img = img.transpose(0, 1).transpose(0, 2).contiguous()
+        # img = img[0]
+        # img = img.unsqueeze(0)
+
         if isinstance(img, torch.ByteTensor):
             return img.float().div(255)
         else:
@@ -232,15 +255,15 @@ def getTrainingTestingData(batch_size):
     onlyfiles = [f for f in listdir(dir_path) if isfile(join(dir_path, f))]
     print("Data available: ", onlyfiles)
     try:
-        data, nyu2_train = loadZipToMem(path_to_load)
+        data, nyu2_train,nyu2_test = loadZipToMem(path_to_load)
     except FileNotFoundError:
         path_to_load = change_path()
-        data, nyu2_train = loadZipToMem(path_to_load)
+        data, nyu2_train,nyu2_test = loadZipToMem(path_to_load)
 
     print(f"Loaded {path_to_load}")
 
     transformed_training = depthDatasetMemory(data, nyu2_train, transform=getDefaultTrainTransform())
-    transformed_testing = depthDatasetMemory(data, nyu2_train, transform=getNoTransform())
+    transformed_testing = depthDatasetMemory(data, nyu2_test, transform=getNoTransform())
 
     return DataLoader(transformed_training, batch_size, shuffle=False), DataLoader(transformed_testing, batch_size,
                                                                                   shuffle=False)

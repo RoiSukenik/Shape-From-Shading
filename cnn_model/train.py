@@ -1,17 +1,16 @@
-import os
-import time
 import argparse
 import datetime
+import os
+import time
 from pathlib import Path
 
+import matplotlib
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.utils as utils
 import torchvision.utils as vutils
-import matplotlib
+
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 
 # from tensorboardX import SummaryWriter
 from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
@@ -23,7 +22,8 @@ try:
     from cnn_model.loss import ssim
     from cnn_model.data import getTrainingTestingData
     from cnn_model.utils import AverageMeter, DepthNorm, colorize
-    from cnn_model.constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, LOGS_DIR, NOTES, HYPER_PARAMS, CUDA, GPU_TO_RUN, NET_MIDSAVE_THREAD, SAVE_MODEL
+    from cnn_model.constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, LOGS_DIR, NOTES, HYPER_PARAMS, CUDA, GPU_TO_RUN, \
+        NET_MIDSAVE_THREAD, SAVE_MODEL
     from cnn_model.log_visualize import loss_graph
 
     # from cnn_model.loss_rt_graph import start_graph_thread
@@ -36,7 +36,8 @@ except:
     from loss import ssim
     from data import getTrainingTestingData
     from utils import AverageMeter, DepthNorm, colorize
-    from constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, NOTES, HYPER_PARAMS, CUDA, GPU_TO_RUN, NET_MIDSAVE_THREAD, SAVE_MODEL
+    from constants import ZIP_NAME, MIN_DEPTH, MAX_DEPTH, NOTES, HYPER_PARAMS, CUDA, GPU_TO_RUN, NET_MIDSAVE_THREAD, \
+        SAVE_MODEL
     from log_visualize import loss_graph
 
     # from loss_rt_graph import start_graph_thread
@@ -44,16 +45,12 @@ except:
     from predict import show_net_output, test_predict
     from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
 
-from torchvision import datasets, transforms
-from torchvision.datasets import MNIST
 import threading
-import random
-
 
 # CUDA = False
 
 PATH = Path(__file__).parent.absolute()
-SAVE_IN_RUN = 0 #GLOBAL FOR MIDTRAIN SAVE
+SAVE_IN_RUN = 0  # GLOBAL FOR MIDTRAIN SAVE
 
 
 def save_model(model, output_path, train_size, lr, epoch, time):
@@ -79,9 +76,8 @@ def save_model(model, output_path, train_size, lr, epoch, time):
                 PATH = input("New Path?")
 
 
-
 def make_run_dir(date_time, run_start_time):
-    run_dir = PATH / "results" / (ZIP_NAME + '_' +run_start_time) /date_time
+    run_dir = PATH / "results" / (ZIP_NAME + '_' + run_start_time) / date_time
     plot_dir = run_dir.parent / "loss_plots"
     predict_dir = run_dir.parent / "predict"
     model_dir = run_dir / "saved_model"
@@ -96,7 +92,7 @@ def make_run_dir(date_time, run_start_time):
     return run_dir, model_dir, log_dir, mid_run_dir
 
 
-def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
+def main(hyper_params_dict, train_loader, test_loader=0, run_start_time=None):
     # Arguments
 
     global SAVE_IN_RUN
@@ -124,7 +120,7 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
     parser = argparse.ArgumentParser(description='High Quality Monocular Depth Estimation via Transfer Learning')
     parser.add_argument('--epochs', default=EPOCHS, type=int, help='number of total epochs to run')
     parser.add_argument('--lr', '--learning-rate', default=LEARNING_RATE, type=float, help='initial learning rate')
-    parser.add_argument('--bs', default=4, type=int, help='batch size')
+    parser.add_argument('--bs', default=len(GPU_TO_RUN), type=int, help='batch size')
     args = parser.parse_args()
 
     # Create model with gpu
@@ -136,8 +132,7 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
 
     if CUDA:
         model = Model().cuda()
-        model = nn.DataParallel(model, device_ids=GPU_TO_RUN)
-        model.to(f'cuda:{model.device_ids[0]}')
+        model = nn.DataParallel(model, device_ids=GPU_TO_RUN, output_device=GPU_TO_RUN[-1])
         print('cuda enable.')
     else:
         model = Model()
@@ -147,23 +142,14 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
 
     # Training parameters
     optimizer = torch.optim.Adam(model.parameters(), args.lr)
-    batch_size = 4  # batch size is how many pics at one go
+    batch_size = len(GPU_TO_RUN)  # batch size is how many pics at one go
     prefix = 'densenet_' + str(batch_size)
-
-    # Load data
 
     N = len(train_loader)
 
-    ### ADDED RANDOM BATCHING
-
-    # Logging
-    try:
-        writer = SummaryWriter(comment='{}-lr{}-e{}-bs{}'.format(prefix, args.lr, args.epochs, args.bs), flush_secs=30)
-    except:
-        pass
-
     # Loss
     l1_criterion = nn.L1Loss()
+    # l1_criterion = nn.MSELoss()
 
     to_print = str(hyper_params_dict)
 
@@ -201,7 +187,7 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
         # random.shuffle(batch_ind_lst)
         batch_ind_lst = np.random.choice(N, N, replace=False)
         # for i, sample_batched in enumerate(train_loader):
-        # WRONG IND 88
+
         for i, rand_batch_ind in enumerate(batch_ind_lst):
             batch_count += 1
             sample_batched = train_loader[rand_batch_ind]
@@ -209,20 +195,22 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
 
             # Prepare sample and target
             if CUDA:
-                image = torch.autograd.Variable(sample_batched['image'].cuda())
-                depth = torch.autograd.Variable(sample_batched['depth'].cuda(non_blocking=True))
+                image = torch.autograd.Variable(sample_batched['image'].cuda(device = GPU_TO_RUN[-1]))
+                depth = torch.autograd.Variable(sample_batched['depth'].cuda(device = GPU_TO_RUN[-1], non_blocking=True))
             else:
                 image = torch.autograd.Variable(sample_batched['image'])
                 depth = torch.autograd.Variable(sample_batched['depth'])
 
             # Normalize depth
-            depth_n = DepthNorm(depth)
+            depth_ns = DepthNorm(depth)
 
             # Fix for one output
-            depth_n = depth_n[0]
-            depth_n = depth_n.unsqueeze(0)
-            depth_n = depth_n[0][0]
-            depth_n = torch.reshape(depth_n, (1, 1, depth_n.shape[0], depth_n.shape[1]))
+            depth_lst = []
+            for dept in depth_ns:
+                depth_n1 = dept[0]
+                depth_n2 = depth_n1.unsqueeze(0)
+                depth_lst.append(depth_n2)
+            depth_n = torch.stack(depth_lst)
 
             ### debug show input img
             # fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
@@ -244,38 +232,22 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
                 SAVE_IN_RUN = 0
                 threading.Thread(target=save_in_run_thread).start()
 
-            # frequency = depth_n==1
-            # one_occour = frequency.sum().item()
-            # num_of_elements = torch.numel(depth_n)
-            # total_per = (one_occour /num_of_elements) * 100
+
 
             # MASK ATTEMPT
+            # output = output.to(f'cuda:{0}')
             background = depth_n == 1
             depth_masked = depth_n.masked_fill_(background, 0.0)
             output_masked = output.masked_fill_(background, 0.0)
 
-            # depth_masked = torch.masked_select(depth_n, background)
-            #
-            # output_masked = torch.masked_select(output, background)
-            #
-            # new_shape = depth_masked.shape[0]
-            #
-            # depth_masked = torch.reshape(depth_masked, (1, 1, 1, new_shape))
-            # output_masked = torch.reshape(output_masked, (1, 1, 1, new_shape))
 
             ## trial with sigmoid normalize the output
             # m = nn.Sigmoid()
             # output_masked = m(output_masked)
 
-            # depth_n[background] = 0
-            # output_masked = output
-            # output_masked[background] = 0
-            # output[background] = 0
-
             # Compute the loss
             l_depth = l1_criterion(output_masked, depth_masked)
 
-            # l_ssim = torch.clamp((1 - ssim(output_masked, depth_masked, val_range=VAL_RANGE)) * 0.5, 0, 1)
 
             # trial new ssim
             l_ssim = 1 - ssim(output_masked, depth_masked, data_range=1, size_average=False,
@@ -284,17 +256,17 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
             loss = (SSIM_WEIGHT * l_ssim) + (L1_WEIGHT * l_depth)
 
             # Update step
-            losses.update(loss.data.item(), image.size(0))
+            losses.update(loss.sum().item(), image.size(0))
 
             # Gradient Accumulation
-            loss = loss / ACCUMULATION_STEPS
-            loss.backward()
-            if (batch_count - 1) % ACCUMULATION_STEPS == 0:
-                optimizer.step()
-                # Reset gradients, for the next accumulated batches
-                optimizer.zero_grad()
-
-            # optimizer.step()
+            # loss = loss / ACCUMULATION_STEPS
+            # loss.backward()
+            # if (batch_count - 1) % ACCUMULATION_STEPS == 0:
+            #     optimizer.step()
+            #     # Reset gradients, for the next accumulated batches
+            #     optimizer.zero_grad()
+            loss.sum().backward()
+            optimizer.step()
 
             # Measure elapsed time
             batch_time.update(time.time() - end)
@@ -309,12 +281,6 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
 
                 current_time = now.strftime("%H:%M:%S")
 
-                # print('Epoch: [{0}][{1}/{2}]\t'
-                #       'Curr Time {current_time}\t'
-                #       'Time {batch_time.val:.3f} ({batch_time.sum:.3f})\t'
-                #       'ETA {eta}\t'
-                #       'Loss {loss.val:.4f} ({loss.avg:.4f})'
-                #       .format(epoch, i, N,current_time=current_time, batch_time=batch_time, loss=losses, eta=eta))
                 to_print = 'Epoch: [{0}][{1}/{2}]\tTime {batch_time.val:.3f} ({batch_time.sum:.3f})\tETA {eta}\tLoss {loss.val:.4f} ({loss.avg:.4f})'.format(
                     epoch, i, N, batch_time=batch_time, loss=losses, eta=eta)
                 print(to_print)
@@ -322,26 +288,24 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
                     print(to_print, file=text_file)
 
                 to_print2 = 'Epoch: [{0}][{1}/{2}]\tTime {batch_time.val:.3f} ({batch_time.sum:.3f})\tETA {eta}\tLoss {loss[0]:.4f} ({loss[1]:.4f})'.format(
-                    epoch, i, N, batch_time=batch_time, loss=[l_depth.item(), l_ssim.item()], eta=eta)
+                    epoch, i, N, batch_time=batch_time, loss=[l_depth.sum().item(), l_ssim.sum().item()], eta=eta)
 
                 with open(str(log_dir / (date_time + "_loss_log.txt")), "a") as text_file:
                     print(to_print2, file=text_file)
 
-                # Log to tensorboard
-                try:
-                    writer.add_scalar('Train/Loss', losses.val, niter)
 
-                except:
-                    pass
+        try:
+            with torch.no_grad():
+                test_loss, test_l1_loss, test_ssim_loss = test_predict(model, epoch, test_loader, mid_run_dir)
+                print(f"\ntest loss = {test_loss}, test_l1_loss={test_l1_loss}, test_ssim_loss={test_ssim_loss} \n")
+                to_print3 = 'Epoch: [{0}][{1}/{2}]\tTime {batch_time:.3f} ({batch_time:.3f})\tETA {eta}\tLoss {loss[0]:.4f} ({loss[1]:.4f})'.format(
+                    epoch, i, N, batch_time=test_loss, loss=[test_l1_loss, test_ssim_loss], eta=eta)
+                with open(str(log_dir / (date_time + "_loss_test_log.txt")), "a") as text_file:
+                    print(to_print3, file=text_file)
 
-            try:
-                if i % 300 == 0:
-                    LogProgress(model, writer, test_loader, niter)
+        except Exception as e:
+            print(e)
 
-            except:
-                pass
-        # show_net_output(output, f"Epoch_{epoch}")
-        test_predict(model, epoch, mid_run_dir)
         # Record epoch's intermediate results
         if USE_SCHEDULER:
             if ADAPTIVE_LEARNER:
@@ -349,27 +313,18 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time = None):
             else:
                 scheduler.step()
 
-        try:
-            LogProgress(model, writer, test_loader, niter)
-
-        except:
-            pass
-        try:
-            writer.add_scalar('Train/Loss.avg', losses.avg, epoch)
-
-        except:
-            pass
     epoch = args.epochs
-    test_predict(model, epoch, run_dir, hyper_params_dict)
+
+    with torch.no_grad():
+        test_predict(model, epoch, test_loader, run_dir, hyper_params_dict)
+
     loss_graph(str(log_dir / date_time), hyper_params_dict, output_path2=str(run_dir / date_time))
 
-    
     if SAVE_MODEL:
         save_model(model, model_dir, N, LEARNING_RATE, epoch, date_time)
     if NET_MIDSAVE_THREAD:
         os._exit(1)
     return model
-
 
 
 try:
@@ -402,24 +357,24 @@ except:
 
 if __name__ == '__main__':
     import gc
+
     gc.collect()
     torch.cuda.empty_cache()
-    with torch.cuda.device(GPU_TO_RUN[0]):
-        print(torch.cuda.memory_allocated(GPU_TO_RUN[0]))
-        train_loader, test_loader = getTrainingTestingData(batch_size=4)
-        train_loader = [sample_batched for sample_batched in train_loader]
-        now = datetime.datetime.now()  # current date and time
-        date_time = now.strftime("%d%m%Y_%H%M%S")
-        if RESUME_RUN:
-            date_time = RESUME_RUN
-        for i in range(len(HYPER_PARAMS["LEARNING_RATE"])):
-            print(f"\nRun Number: {i}\n")
-            curr_hyper_dict = {}
-            for key in HYPER_PARAMS:
-                curr_hyper_dict[key] = HYPER_PARAMS[key][i]
-            model = main(curr_hyper_dict, train_loader,0, date_time)
+    # with torch.cuda.device(GPU_TO_RUN):
+    train_loader, test_loader = getTrainingTestingData(batch_size=len(GPU_TO_RUN))
 
-            del model
-            gc.collect()
-            torch.cuda.empty_cache()
+    train_loader = [sample_batched for sample_batched in train_loader]
+    now = datetime.datetime.now()  # current date and time
+    date_time = now.strftime("%d%m%Y_%H%M%S")
+    if RESUME_RUN:
+        date_time = RESUME_RUN
+    for i in range(len(HYPER_PARAMS["LEARNING_RATE"])):
+        print(f"\nRun Number: {i}\n")
+        curr_hyper_dict = {}
+        for key in HYPER_PARAMS:
+            curr_hyper_dict[key] = HYPER_PARAMS[key][i]
+        model = main(curr_hyper_dict, train_loader, test_loader, date_time)
 
+        del model
+        gc.collect()
+        torch.cuda.empty_cache()
