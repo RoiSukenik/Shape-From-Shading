@@ -4,12 +4,12 @@ import torch
 
 CURRENT_DIR = str(pathlib.Path(__file__).parent.absolute())
 
-CUDA = torch.cuda.is_available()
+CUDA = True
 NET_MIDSAVE_THREAD = True
 SAVE_MODEL = True
 GPU_TO_RUN = [0]
 
-TEST = 0
+TEST = 1
 
 """"sfs2_small_face_data sfs2_data sfs2_big_data sfs2_small_pics_data"""
 """PATHS & DATA"""
@@ -23,6 +23,9 @@ DATA_NAME = "sfs"
 DATA_PATH = str(pathlib.Path(__file__).parent.absolute()) + f"/{ZIP_NAME}.zip"
 if TEST:
     DATA_PATH = f"/data/roeematan/sfs/{ZIP_NAME}.zip"
+
+# DATA_PATH = f"/data/students/roeematan/sfs_data_30k.zip"
+
 LS_AMOUNT = 4
 
 """TRAINING CONSTS"""  # ORIGINAL VALS
@@ -35,7 +38,7 @@ L1_WEIGHT = 0.1  # 0.1
 EPOCHS = 1
 ACCUMULATION_STEPS = 16
 MERGE_METHOD = "concat"
-# MERGE_METHOD = "mean"
+#MERGE_METHOD = "mean"
 
 """Optional VARS"""
 USE_SCHEDULER = True

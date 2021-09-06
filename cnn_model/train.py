@@ -53,12 +53,14 @@ PATH = Path(__file__).parent.absolute()
 SAVE_IN_RUN = 0  # GLOBAL FOR MIDTRAIN SAVE
 
 
-def save_model(model, output_path, train_size, lr, epoch, time):
+def save_model(model, output_path, train_size, lr, epoch, time, optimizer):
     SAVED = False
     while not SAVED:
         try:
             model_name = ZIP_NAME + "_" + time + f"_{train_size}_{format(lr, '.2e')}_{epoch}" + ".pth"
-            torch.save(model.state_dict(), str(output_path / model_name))
+            state = {'epoch': epoch + 1, 'state_dict': model.state_dict(),'optimizer': optimizer.state_dict() }
+            torch.save(state, str(output_path / model_name))
+            # torch.save(model.state_dict(), str(output_path / model_name))
             log_name = time + "_log.txt"
             SAVED = True
 
@@ -191,7 +193,7 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time=None):
         for i, rand_batch_ind in enumerate(batch_ind_lst):
             batch_count += 1
             sample_batched = train_loader[rand_batch_ind]
-            optimizer.zero_grad()
+            #optimizer.zero_grad()
 
             # Prepare sample and target
             if CUDA:
@@ -228,7 +230,7 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time=None):
             output = model(image)
             if SAVE_IN_RUN:
                 print("Saving Model:")
-                save_model(model, model_dir, N, LEARNING_RATE, epoch, date_time)
+                save_model(model, model_dir, N, LEARNING_RATE, epoch, date_time,optimizer)
                 SAVE_IN_RUN = 0
                 threading.Thread(target=save_in_run_thread).start()
 
@@ -258,15 +260,15 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time=None):
             # Update step
             losses.update(loss.sum().item(), image.size(0))
 
-            # Gradient Accumulation
-            # loss = loss / ACCUMULATION_STEPS
-            # loss.backward()
-            # if (batch_count - 1) % ACCUMULATION_STEPS == 0:
-            #     optimizer.step()
-            #     # Reset gradients, for the next accumulated batches
-            #     optimizer.zero_grad()
-            loss.sum().backward()
-            optimizer.step()
+            #Gradient Accumulation
+            loss = (loss.sum()) / ACCUMULATION_STEPS
+            loss.backward()
+            if (batch_count - 1) % ACCUMULATION_STEPS == 0:
+                 optimizer.step()
+                 # Reset gradients, for the next accumulated batches
+                 optimizer.zero_grad()
+            #loss.sum().backward()
+            #optimizer.step()
 
             # Measure elapsed time
             batch_time.update(time.time() - end)
@@ -321,7 +323,7 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time=None):
     loss_graph(str(log_dir / date_time), hyper_params_dict, output_path2=str(run_dir / date_time))
 
     if SAVE_MODEL:
-        save_model(model, model_dir, N, LEARNING_RATE, epoch, date_time)
+        save_model(model, model_dir, N, LEARNING_RATE, epoch, date_time,optimizer)
     if NET_MIDSAVE_THREAD:
         os._exit(1)
     return model

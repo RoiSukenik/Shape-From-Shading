@@ -52,11 +52,11 @@ class Decoder(nn.Module):
             x_block3 = torch.reshape(x_block3, (1,  x_block3.shape[1]*x_block3.shape[2], x_block3.shape[3], x_block3.shape[4]))
             x_block4 = torch.reshape(x_block4, (1, x_block4.shape[1]*x_block4.shape[2], x_block4.shape[3], x_block4.shape[4]))
         else:
-            x_block0 = torch.mean(x_block0, 0, True)
-            x_block1 = torch.mean(x_block1, 0, True)
-            x_block2 = torch.mean(x_block2, 0, True)
-            x_block3 = torch.mean(x_block3, 0, True)
-            x_block4 = torch.mean(x_block4, 0, True)
+            x_block0 = torch.mean(torch.squeeze(x_block0), 0, True)
+            x_block1 = torch.mean(torch.squeeze(x_block1), 0, True)
+            x_block2 = torch.mean(torch.squeeze(x_block2), 0, True)
+            x_block3 = torch.mean(torch.squeeze(x_block3), 0, True)
+            x_block4 = torch.mean(torch.squeeze(x_block4), 0, True)
 
 
 
