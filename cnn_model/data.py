@@ -128,15 +128,27 @@ class depthDatasetMemory(Dataset):
         self.data, self.nyu_dataset = data, nyu2_train
         joined_list = []
         tmp_lst = []
-
         for i, data in enumerate(nyu2_train):
-
-            if i%3==0 and i!=0:
+            if (i+1)%4==0:
                 tmp_lst.append(data[0])
                 tmp_lst.append(data[1])
                 joined_list.append(tmp_lst)
                 tmp_lst = []
-            tmp_lst.append(data[0])
+            else:
+                tmp_lst.append(data[0])
+        wrong_lst = []
+        for data in joined_list:
+            batch_ind = data[0][-12:-7]
+            for img in data:
+                if "depth" in img:
+                    img_ind = img[-16:-11]
+                else:
+                    img_ind = img[-12:-7]
+                if img_ind != batch_ind:
+                    wrong_lst.append([data,img_ind,batch_ind])
+        if wrong_lst:
+            print(f"problem with batch sorting - num of wrong: {len(wrong_lst)}")
+
         self.nyu_dataset = joined_list
         self.transform = transform
 
@@ -147,7 +159,10 @@ class depthDatasetMemory(Dataset):
             im = im.replace('\\', '/')
             if "depth" in im:
                 im = im.replace('\r', '')
+            a= sample[0]
+            a = a.replace('\\', '/')
 
+            b= self.data[a]
             img = Image.open(BytesIO(self.data[im]))
             img = img.convert('L')
             np_img = np.array(img, dtype=np.uint8)
@@ -265,7 +280,7 @@ def getTrainingTestingData(batch_size):
     transformed_training = depthDatasetMemory(data, nyu2_train, transform=getDefaultTrainTransform())
     transformed_testing = depthDatasetMemory(data, nyu2_test, transform=getNoTransform())
 
-    return DataLoader(transformed_training, batch_size, shuffle=False), DataLoader(transformed_testing, batch_size,
+    return DataLoader(transformed_training, batch_size, shuffle=True), DataLoader(transformed_testing, batch_size,
                                                                                   shuffle=False)
 if __name__ == '__main__':
     create_pdf("C:\\Users\\machiel\\PycharmProjects\\Shape-From-Shading\\cnn_model\\data")
