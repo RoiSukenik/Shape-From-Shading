@@ -55,6 +55,7 @@ SAVE_IN_RUN = 0  # GLOBAL FOR MIDTRAIN SAVE
 
 def save_model(model, output_path, train_size, lr, epoch, time, optimizer):
     SAVED = False
+    script_path = Path(__file__).parent.absolute()
     while not SAVED:
         try:
             model_name = ZIP_NAME + "_" + time + f"_{train_size}_{format(lr, '.2e')}_{epoch}" + ".pth"
@@ -63,19 +64,19 @@ def save_model(model, output_path, train_size, lr, epoch, time, optimizer):
             # torch.save(model.state_dict(), str(output_path / model_name))
             log_name = time + "_log.txt"
             SAVED = True
-
-            with open("last_model.txt", "w") as text_file:
+            
+            with open(os.path.join(script_path, "last_model.txt"), "w") as text_file:
                 print(str(os.path.join(output_path, model_name)), file=text_file)
 
             print(f"MODEL SAVED SUCSSEFFULLY IN:\n{model_name}")
             print(f"Log name is:\n{log_name}")
         except:
-            print(PATH)
+            print(script_path)
             a = input("Change Path? (y/n)")
             if a == 'n':
                 continue
             else:
-                PATH = input("New Path?")
+                script_path = input("New Path?")
 
 
 def make_run_dir(date_time, run_start_time):
@@ -187,12 +188,12 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time=None):
 
         end = time.time()
         # random.shuffle(batch_ind_lst)
-        batch_ind_lst = np.random.choice(N, N, replace=False)
-        # for i, sample_batched in enumerate(train_loader):
+        # batch_ind_lst = np.random.choice(N, N, replace=False)
+        for i, sample_batched in enumerate(train_loader):
 
-        for i, rand_batch_ind in enumerate(batch_ind_lst):
+        # for i, rand_batch_ind in enumerate(batch_ind_lst):
             batch_count += 1
-            sample_batched = train_loader[rand_batch_ind]
+            # sample_batched = train_loader[rand_batch_ind]
             #optimizer.zero_grad()
 
             # Prepare sample and target
@@ -215,13 +216,16 @@ def main(hyper_params_dict, train_loader, test_loader=0, run_start_time=None):
             depth_n = torch.stack(depth_lst)
 
             ### debug show input img
-            # fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
-            # fig.suptitle(f'rand_batch_ind - {rand_batch_ind}')
-            # ax1.imshow(image[0].cpu().permute(1, 2, 0))
-            # ax2.imshow(image[1].cpu().permute(1, 2, 0))
-            # ax3.imshow(image[2].cpu().permute(1, 2, 0))
-            # ax4.imshow(image[3].cpu().permute(1, 2, 0))
-            # plt.show()
+            # matplotlib.use('TkAgg')
+            #import matplotlib.pyplot as plt
+
+            #fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+            #fig.suptitle(f"epoch {epoch} ind {i}")
+            #ax1.imshow(image[0][0].cpu().permute(1, 2, 0))
+            #ax2.imshow(image[0][1].cpu().permute(1, 2, 0))
+            #ax3.imshow(image[0][2].cpu().permute(1, 2, 0))
+            #ax4.imshow(image[0][3].cpu().permute(1, 2, 0))
+            #plt.show()
 
             # plt.imshow(depth[3].permute(1, 2, 0))
             # plt.show()
@@ -357,6 +361,15 @@ try:
 except:
     pass
 
+def wrapper(gen):
+  while True:
+    try:
+      yield next(gen)
+    except StopIteration:
+      break
+    except Exception as e:
+      print(e) # or whatever kind of logging you want
+
 if __name__ == '__main__':
     import gc
 
@@ -365,7 +378,9 @@ if __name__ == '__main__':
     # with torch.cuda.device(GPU_TO_RUN):
     train_loader, test_loader = getTrainingTestingData(batch_size=len(GPU_TO_RUN))
 
-    train_loader = [sample_batched for sample_batched in train_loader]
+    # train_loader = [sample_batched for sample_batched in train_loader]
+    # train_loader =list(wrapper(sample_batched for sample_batched in train_loader))
+
     now = datetime.datetime.now()  # current date and time
     date_time = now.strftime("%d%m%Y_%H%M%S")
     if RESUME_RUN:

@@ -159,10 +159,15 @@ class depthDatasetMemory(Dataset):
             im = im.replace('\\', '/')
             if "depth" in im:
                 im = im.replace('\r', '')
-            a= sample[0]
-            a = a.replace('\\', '/')
 
-            b= self.data[a]
+            ROI_IDIOT = True
+            if ROI_IDIOT:
+                im = im.replace('datasets/', '')
+
+            # a= sample[0]
+            # a = a.replace('\\', '/')
+            #
+            # b= self.data[a]
             img = Image.open(BytesIO(self.data[im]))
             img = img.convert('L')
             np_img = np.array(img, dtype=np.uint8)

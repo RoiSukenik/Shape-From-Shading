@@ -15,16 +15,16 @@ TEST = 1
 """PATHS & DATA"""
 ZIP_NAME = "sfs4_data"  # for loading and packaging
 if TEST:
-    ZIP_NAME = "sfs2_small_face_data"
+    ZIP_NAME = "data_30K_v2"
 DATA_PATH_FOR_ZIP = CURRENT_DIR + "/data"
-DATA_TO_TRAIN = CURRENT_DIR + "/" + ZIP_NAME
+DATA_TO_TRAIN = CURRENT_DIR  + f"/{ZIP_NAME}.zip"
 LOGS_DIR = str(pathlib.Path(__file__).parent.absolute()) + "/logs/"
 DATA_NAME = "sfs"
 DATA_PATH = str(pathlib.Path(__file__).parent.absolute()) + f"/{ZIP_NAME}.zip"
 if TEST:
-    DATA_PATH = f"/data/roeematan/sfs/{ZIP_NAME}.zip"
+    DATA_PATH = DATA_TO_TRAIN
 
-# DATA_PATH = f"/data/students/roeematan/sfs_data_30k.zip"
+DATA_PATH = f"/data/students/sfs/sfs30ksmall_datagdgs.zip"
 
 LS_AMOUNT = 4
 
@@ -36,12 +36,12 @@ VAL_RANGE = 1000.0  # MAX_DEPTH / MIN_DEPTH
 SSIM_WEIGHT = 1.0  # 1.0
 L1_WEIGHT = 0.1  # 0.1
 EPOCHS = 1
-ACCUMULATION_STEPS = 16
+ACCUMULATION_STEPS = 32
 MERGE_METHOD = "concat"
 #MERGE_METHOD = "mean"
 
 """Optional VARS"""
-USE_SCHEDULER = True
+USE_SCHEDULER = False
 SCHEDULER_STEP_SIZE = 3
 SCHEDULER_GAMMA = 0.1
 NOTES = ""  # NOTES FOR LOG
@@ -53,11 +53,11 @@ HYPER_PARAMS = {"LEARNING_RATE": LEARNING_RATE, "EPOCHS": EPOCHS, "SSIM_WEIGHT":
                 "SCHEDULER_GAMMA": SCHEDULER_GAMMA, "ACCUMULATION_STEPS": ACCUMULATION_STEPS,
                 "ADAPTIVE_LEARNER": ADAPTIVE_LEARNER}
 """
-HYPER_PARAMS = {"LEARNING_RATE": [0.000014],
+HYPER_PARAMS = {"LEARNING_RATE": [0.000004],
                 "EPOCHS": [40],
                 "SSIM_WEIGHT": [1.0],
                 "L1_WEIGHT": [0.1],
-                "USE_SCHEDULER": [True],
+                "USE_SCHEDULER": [False],
                 "SCHEDULER_STEP_SIZE": [3],
                 "SCHEDULER_GAMMA": [0.1],
                 "ACCUMULATION_STEPS": [10],

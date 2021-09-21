@@ -1,1 +1,1 @@
-/home/roeematan/PycharmProjects/Shape-From-Shading/cnn_model/results/sfs2_small_face_data_16052021_145154/06092021_122902/saved_model/sfs2_small_face_data_06092021_122902_139_1.40e-05_40.pth
+/home/roeematan/PycharmProjects/Shape-From-Shading/cnn_model/results/data_30K_v2_16052021_145154/15092021_123406/saved_model/data_30K_v2_15092021_123406_30847_4.00e-06_28.pth

@@ -22,7 +22,7 @@ import matplotlib
 SSIM_WEIGHT = 1.0
 L1_WEIGHT = 0.1
 HORZ_FLIP = False
-HORZ_FLIP = True
+HORZ_FLIP = False
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d
 import torch.nn as nn
@@ -59,7 +59,6 @@ import cv2
 
 LOSS_TITLE = "Loss over Illuminance"
 
-from skimage import exposure
 import numpy as np
 
 
@@ -127,40 +126,40 @@ def load_image(im_path, is_depth=False):
     return image
 
 
-def match_image(src, src_path):
-    ref_dir = "/small_test_dir/00000_"
-    ref_dir = str(Path(__file__).parent.absolute()) + ref_dir
-    if "lu" in src_path:
-        ref_path = ref_dir + "lu.png"
-    if "rd" in src_path:
-        ref_path = ref_dir + "rd.png"
-    if "ru" in src_path:
-        ref_path = ref_dir + "ru.png"
-    if "ld" in src_path:
-        ref_path = ref_dir + "ld.png"
-    img = Image.open(ref_path)
-    img = img.convert('L')
-    ref = np.array(img, dtype=np.uint8)
-    kernel = np.ones((5, 5), np.float32) / 25
-
-    ref[ref < 210] += 40
-
-    src = src[..., np.newaxis]
-    ref = ref[..., np.newaxis]
-
-    # determine if we are performing multichannel histogram matching
-    # and then perform histogram matching itself
-    print("[INFO] performing histogram matching...")
-    multi = True if src.shape[-1] > 1 else False
-    matched = exposure.match_histograms(src, ref, multichannel=multi)
-    from matplotlib import pyplot as plt
-    plt.subplot(121), plt.imshow(src, cmap='gray'), plt.title('Original')
-    plt.xticks([]), plt.yticks([])
-    plt.subplot(122), plt.imshow(matched, cmap='gray'), plt.title('ref')
-    plt.xticks([]), plt.yticks([])
-    plt.show()
-
-    return matched
+# def match_image(src, src_path):
+#     ref_dir = "/small_test_dir/00000_"
+#     ref_dir = str(Path(__file__).parent.absolute()) + ref_dir
+#     if "lu" in src_path:
+#         ref_path = ref_dir + "lu.png"
+#     if "rd" in src_path:
+#         ref_path = ref_dir + "rd.png"
+#     if "ru" in src_path:
+#         ref_path = ref_dir + "ru.png"
+#     if "ld" in src_path:
+#         ref_path = ref_dir + "ld.png"
+#     img = Image.open(ref_path)
+#     img = img.convert('L')
+#     ref = np.array(img, dtype=np.uint8)
+#     kernel = np.ones((5, 5), np.float32) / 25
+#
+#     ref[ref < 210] += 40
+#
+#     src = src[..., np.newaxis]
+#     ref = ref[..., np.newaxis]
+#
+#     # determine if we are performing multichannel histogram matching
+#     # and then perform histogram matching itself
+#     print("[INFO] performing histogram matching...")
+#     multi = True if src.shape[-1] > 1 else False
+#     matched = exposure.match_histograms(src, ref, multichannel=multi)
+#     from matplotlib import pyplot as plt
+#     plt.subplot(121), plt.imshow(src, cmap='gray'), plt.title('Original')
+#     plt.xticks([]), plt.yticks([])
+#     plt.subplot(122), plt.imshow(matched, cmap='gray'), plt.title('ref')
+#     plt.xticks([]), plt.yticks([])
+#     plt.show()
+#
+#     return matched
 
 
 def get_input_img(test_dir):
@@ -215,6 +214,8 @@ def plot_output_image_3D(depth_tensor, fname, output_path=None, params=None):
         plt.show()
     else:
         # ax.view_init(elev=10., azim=180) # side view
+        a = np.asarray(outputImageRealWorldScale)
+        np.savetxt(file_path + ".csv", a, delimiter=",")
         plt.savefig(file_path)
     plt.close("all")
 
@@ -292,32 +293,33 @@ def test_predict(model, epoch, test_loader, output_path=None, params=None):
     l1_loss = 0
     test_len = len(test_loader)
     calc_amount = test_len
-    test_amount_iter = int(test_len / calc_amount)
-    print_amount = 3
-    total_showed = 0
-    total_calc = 0
-    for i, sample_batched in enumerate(test_loader):
-        if i % test_amount_iter != 0:
-            continue
+    if test_len:
+        test_amount_iter = int(test_len / calc_amount)
+        print_amount = 3
+        total_showed = 0
+        total_calc = 0
+        for i, sample_batched in enumerate(test_loader):
+            if i % test_amount_iter != 0:
+                continue
 
-        if CUDA:
-            image = sample_batched['image'].cuda()
-            depth = sample_batched['depth'].cuda(non_blocking=True)
-        else:
-            image = sample_batched['image']
-            depth = sample_batched['depth']
+            if CUDA:
+                image = sample_batched['image'].cuda()
+                depth = sample_batched['depth'].cuda(non_blocking=True)
+            else:
+                image = sample_batched['image']
+                depth = sample_batched['depth']
 
-        output = model(image)
-        if total_showed != print_amount and i % 6 == 0:
-            show_net_output(output, f"epoch_{epoch:02d}_{i}", output_path, params)
-            total_showed += 1
-        if total_showed == print_amount:
-            break
-        # tot_loss, l_ssim, l_depth = calc_loss(output, depth)
-        # loss += tot_loss
-        # ssim_loss += l_ssim
-        # l1_loss += l_depth
-        # total_calc += 1
+            output = model(image)
+            if total_showed != print_amount and i % 6 == 0:
+                show_net_output(output, f"epoch_{epoch:02d}_{i}", output_path, params)
+                total_showed += 1
+            if total_showed == print_amount:
+                break
+            # tot_loss, l_ssim, l_depth = calc_loss(output, depth)
+            # loss += tot_loss
+            # ssim_loss += l_ssim
+            # l1_loss += l_depth
+            # total_calc += 1
 
     if TEST_DIR_MID_RUN:
         for i in range(MID_RUN_TEST_AMOUNT):
@@ -325,7 +327,7 @@ def test_predict(model, epoch, test_loader, output_path=None, params=None):
             batch, depth = load_test_imgs(data_path)
             output = model(batch)
             new_path = "/home/roeematan/PycharmProjects/Shape-From-Shading/cnn_model/test_data/mid_train_test_dir/1/"
-            show_net_output(output, f"RGB{i}_epoch_{epoch:02d}", new_path, params)
+            show_net_output(output, f"RGB{i}_epoch_{epoch:02d}", output_path, params)
 
     # test_loss = loss / (total_calc)
     # l1_loss = l1_loss / (total_calc)
@@ -346,6 +348,8 @@ def load_model():
         model = nn.DataParallel(model)
 
     model_PATH = MODEL_TO_LOAD
+    model_PATH = "/home/roeematan/PycharmProjects/Shape-From-Shading/cnn_model/results/data_30K_v2_16052021_145154/15092021_123406/saved_model/data_30K_v2_15092021_123406_30847_4.00e-06_28.pth"
+
     checkpoint = torch.load(model_PATH)
     model.load_state_dict(checkpoint['state_dict'])
  
